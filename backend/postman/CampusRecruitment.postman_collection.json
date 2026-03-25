@@ -1,0 +1,97 @@
+{
+  "info": {
+    "name": "Campus Recruitment API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Recruiter User\",\n  \"email\": \"recruiter@example.com\",\n  \"password\": \"Recruiter@123\",\n  \"company_name\": \"Demo Technologies Pvt Ltd\",\n  \"portal_type\": \"JNF\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@campus.local\",\n  \"password\": \"Admin@12345\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Dashboard Analytics",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/dashboard/analytics"
+      }
+    },
+    {
+      "name": "Create Job (Composite)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/jobs",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"company_id\": 1,\n  \"cycle_id\": 1,\n  \"job_type\": \"JNF\",\n  \"profile_name\": \"Software Engineer\",\n  \"description\": \"JNF role for 2026\",\n  \"location\": \"Bengaluru\",\n  \"training_period\": \"3 months\",\n  \"bond\": \"None\",\n  \"registration_link\": \"https://example.com/register\",\n  \"joining_month\": \"July\",\n  \"onboarding_procedure\": \"Virtual + in-office\",\n  \"salary\": {\n    \"ctc_lpa\": 18,\n    \"fixed_component\": 14,\n    \"joining_bonus\": 1,\n    \"retention_bonus\": 1,\n    \"variable_component\": 2,\n    \"esops\": 0,\n    \"stocks_options\": 0\n  },\n  \"eligibility\": {\n    \"min_cgpa\": 7.0,\n    \"gender\": \"All\",\n    \"slp_requirement\": \"No active backlog\",\n    \"disciplines_json\": [\"Computer Science & Engineering\"]\n  },\n  \"declaration\": {\n    \"agreed\": true,\n    \"declaration_text\": \"Accepted AIPC guidelines\"\n  },\n  \"stages\": []\n}"
+        }
+      }
+    },
+    {
+      "name": "Applications - Move Next Stage",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/applications/1/move-next-stage"
+      }
+    },
+    {
+      "name": "Upload Company Document",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/documents/company/1",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "List Job Documents",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/documents/job/1"
+      }
+    },
+    {
+      "name": "Delete Job Document",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/documents/job/1"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api" },
+    { "key": "token", "value": "" }
+  ]
+}
