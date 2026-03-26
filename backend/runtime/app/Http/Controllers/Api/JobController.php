@@ -95,7 +95,8 @@ class JobController extends Controller
             $data['company_id'] = $user->company_id;
         }
 
-        $payload = DB::transaction(function () use ($data) {
+        $currentUser = $user;
+        $payload = DB::transaction(function () use ($data, $currentUser) {
             $company = Company::findOrFail($data['company_id']);
             $company->annual_turnover = $data['annual_turnover'];
             $company->save();
@@ -122,7 +123,7 @@ class JobController extends Controller
                 'job_id' => $job->job_id,
                 'agreed' => true,
                 'agreed_at' => now(),
-                'agreed_by_user_id' => auth()->id(),
+                'agreed_by_user_id' => $currentUser->id,
                 'declaration_text' => $data['declaration']['declaration_text'] ?? null,
                 'aipc_guidelines_json' => $data['declaration']['aipc_guidelines'],
             ]);
@@ -141,8 +142,8 @@ class JobController extends Controller
             // Create a JobApplication automatically for the recruiter
             JobApplication::create([
                 'job_id' => $job->job_id,
-                'candidate_name' => auth()->user()->name,
-                'candidate_email' => auth()->user()->email,
+                'candidate_name' => $currentUser->name,
+                'candidate_email' => $currentUser->email,
                 'status' => 'in progress',
                 'application_date' => now(),
                 'is_draft' => false,

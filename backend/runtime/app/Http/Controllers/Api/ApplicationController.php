@@ -7,6 +7,7 @@ use App\Models\JobApplication;
 use App\Models\JobProfile;
 use App\Models\JobStage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ApplicationController extends Controller
@@ -14,16 +15,17 @@ class ApplicationController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $query = JobApplication::with([
-            'job:job_id,job_type,profile_name,location,company_id,work_mode,offline_job_location',
-            'job.company:company_id,name,street,city,country,pincode,postal_address,phone,landline,website,social_media,established_year,annual_turnover',
-        ]);
+        Log::info("Application list requested by user: {$user->id}, role: {$user->role}, company_id: {$user->company_id}");
+        $query = JobApplication::query();
+        
         if ($request->filled('job_id')) {
             $query->where('job_id', $request->job_id);
         }
+        
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        
         if ($request->filled('portal_type')) {
             $portalType = $request->portal_type;
             $query->whereHas('job', function ($q) use ($portalType) {
@@ -38,7 +40,15 @@ class ApplicationController extends Controller
 
         $perPage = min(max((int) $request->get('per_page', 15), 1), 200);
         $rows = $query->paginate($perPage);
+        
+        // Debug: Log the count of applications found
+        Log::info('Applications found: ' . $rows->total());
+        
         $rows->getCollection()->transform(function ($app) {
+            // Manually load relationships to avoid eager loading issues
+            $job = JobProfile::with('company')->find($app->job_id);
+            $app->setRelation('job', $job);
+
             $stages = JobStage::where('job_id', $app->job_id)->orderBy('sequence')->get();
             $totalStages = $stages->count();
             $currentSequence = 0;
@@ -61,17 +71,18 @@ class ApplicationController extends Controller
             $app->total_stages = $totalStages;
             $app->current_sequence = $currentSequence;
             $app->progress_percent = $progress;
-            $app->job_type = $app->job?->job_type;
-            $app->profile_name = $app->job?->profile_name;
-            $app->job_location = $app->job?->location;
-            $app->work_mode = $app->job?->work_mode;
-            $app->offline_job_location = $app->job?->offline_job_location;
-            $app->company_name = $app->job?->company?->name;
-            $app->annual_turnover = $app->job?->company?->annual_turnover;
-            $app->company_location = collect([$app->job?->company?->street, $app->job?->company?->city, $app->job?->company?->country, $app->job?->company?->pincode])
-                ->filter()
-                ->join(', ');
-            $app->year_of_establishment = $app->job?->company?->established_year;
+            $app->created_at = $app->application_date ?? $app->updated_at;
+            $app->job_type = $job?->job_type;
+            $app->profile_name = $job?->profile_name;
+            $app->job_location = $job?->location;
+            $app->work_mode = $job?->work_mode;
+            $app->offline_job_location = $job?->offline_job_location;
+            $app->company_name = $job?->company?->name;
+            $app->annual_turnover = $job?->company?->annual_turnover;
+            $app->company_location = $job?->company 
+                ? collect([$job->company->street, $job->company->city, $job->company->country, $job->company->pincode])->filter()->join(', ')
+                : null;
+            $app->year_of_establishment = $job?->company?->established_year;
             $draft = (bool) $app->is_draft;
             $app->is_editable = $draft
                 || (((int) ($app->edit_count ?? 0) < 1) && !$app->is_withdrawn);

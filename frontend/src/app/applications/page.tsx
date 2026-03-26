@@ -40,11 +40,13 @@ export default function ApplicationsPage() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const portalType = (searchParams.get("portal") || "") as "INF" | "JNF" | "";
+  const statusFilter = searchParams.get("status") || "";
   const [rows, setRows] = useState<ApplicationRow[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
   const latestRequestIdRef = useRef(0);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
 
   const isAdmin = (session?.user as any)?.role === "admin";
 
@@ -54,13 +56,16 @@ export default function ApplicationsPage() {
     const requestId = ++latestRequestIdRef.current;
     const params: Record<string, string> = { per_page: "200" };
     if (portalType) params.portal_type = portalType;
+    if (statusFilter) params.status = statusFilter;
     
     try {
       const res = await api.get("/applications", { headers: authHeaders(session), params });
       if (!mountedRef.current || requestId !== latestRequestIdRef.current) return;
       setRows((res.data?.data || []) as ApplicationRow[]);
     } catch (err) {
-      setError("Failed to load applications.");
+      if (mountedRef.current && requestId === latestRequestIdRef.current) {
+        setError("Failed to load applications.");
+      }
     }
   };
 
@@ -82,11 +87,23 @@ export default function ApplicationsPage() {
   };
 
   useEffect(() => {
+    setIsMounted(true);
+    mountedRef.current = true;
     load();
+    return () => {
+      // We don't set it to false here because we want subsequent effects in the same mount lifecycle to work
+    };
+  }, [session, portalType, statusFilter]);
+
+  useEffect(() => {
     return () => {
       mountedRef.current = false;
     };
-  }, [session, portalType]);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   const startEditSubmitted = async (row: ApplicationRow) => {
     if (!session || !row.is_editable) return;
@@ -137,12 +154,24 @@ export default function ApplicationsPage() {
     return <Chip label={config.label} color={config.color} size="small" />;
   };
 
+  const getTitle = () => {
+    if (isAdmin) {
+      if (statusFilter === "in progress") return "Pending Approval Submissions";
+      if (portalType === "JNF") return "JNF Submissions";
+      if (portalType === "INF") return "INF Submissions";
+      return "All Company Submissions";
+    }
+    if (portalType === "JNF") return "My JNF Applications";
+    if (portalType === "INF") return "My INF Applications";
+    return "All My Applications";
+  };
+
   return (
     <AppShell>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            {isAdmin ? "Review All Applications" : (portalType ? `${portalType} Applications` : "All Applications")}
+            {getTitle()}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {isAdmin ? "Administrative view: Approve or reject submissions from all companies." : "View and manage applications submitted by your company."}

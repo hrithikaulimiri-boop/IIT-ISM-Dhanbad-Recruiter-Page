@@ -17,6 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const portalFilter = searchParams.get("portal");
   const typeFilter = searchParams.get("type");
+  const statusFilter = searchParams.get("status");
   const { data: session, status } = useSession();
 
   const handleLogout = async () => {
@@ -33,9 +34,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const navItems = isAdmin 
     ? [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/applications", label: "All Applications", icon: ClipboardList },
+        { href: "/applications", label: "All Submissions", icon: ClipboardList },
+        { href: "/applications?status=in progress", label: "Pending Approval", icon: FileSearch },
         { href: "/applications?portal=JNF", label: "JNF Submissions", icon: FileCheck },
-        { href: "/applications?portal=INF", label: "INF Submissions", icon: FileSearch },
+        { href: "/applications?portal=INF", label: "INF Submissions", icon: GraduationCap },
       ]
     : [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -61,8 +63,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             const isSelected = item.href.startsWith("/applications")
               ? pathname === "/applications" &&
                 (item.href === "/applications"
-                  ? !portalFilter
-                  : !!portalFilter && item.href.endsWith(`portal=${portalFilter}`))
+                  ? !portalFilter && !statusFilter
+                  : (item.href.includes(`portal=${portalFilter}`) || item.href.includes(`status=${statusFilter}`)))
               : item.href.startsWith("/jobs")
                 ? pathname === "/jobs" && !!typeFilter && item.href.endsWith(`type=${typeFilter}`)
               : pathname === item.href;
