@@ -84,7 +84,7 @@ return new class extends Migration {
         });
 
         Schema::create('salary', function (Blueprint $table) {
-            $table->id();
+            $table->id('salary_id');
             $table->foreignId('job_id')->constrained('job_profile', 'job_id')->cascadeOnDelete();
             $table->decimal('ctc_lpa', 10, 2);
             $table->decimal('fixed_component', 10, 2)->nullable();

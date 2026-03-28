@@ -37,22 +37,31 @@ class JobController extends Controller
     public function store(Request $request)
     {
         $user = auth()->user();
-        $data = $request->validate([
+        $isSubmitted = $request->status === 'submitted';
+
+        $rules = [
+            'job_id' => 'nullable|integer|exists:job_profile,job_id',
             'company_id' => 'required|exists:company,company_id',
             'cycle_id' => 'required|exists:recruitment_cycle,cycle_id',
             'job_type' => 'required|in:INF,JNF',
-            'profile_name' => 'required|string',
-            'description' => 'required|string',
-            'location' => 'required|string',
+            'profile_name' => $isSubmitted ? 'required|string' : 'nullable|string',
+            'description' => $isSubmitted ? 'required|string' : 'nullable|string',
+            'location' => $isSubmitted ? 'required|string' : 'nullable|string',
+            'work_mode' => 'nullable|in:online,offline',
+            'offline_job_location' => 'nullable|string',
             'training_period' => 'nullable|string',
             'bond' => 'nullable|string',
-            'registration_link' => 'nullable|url',
+            'registration_link' => 'nullable|string', // Changed from url to string for flexibility
             'joining_month' => 'nullable|string',
             'onboarding_procedure' => 'nullable|string',
             'num_employees' => 'nullable|string',
             'sector' => 'nullable|string',
-            'salary.ctc_lpa' => 'required_if:job_type,JNF|nullable|numeric|min:0',
-            'salary.stipend' => 'required_if:job_type,INF|nullable|string',
+            'job_categories' => 'nullable|array',
+            'status' => 'nullable|in:draft,pending,submitted',
+            'last_completed_step' => 'nullable|integer',
+            'salary.ctc_lpa' => ($isSubmitted && $request->job_type === 'JNF') ? 'required|numeric|min:0' : 'nullable|numeric|min:0',
+            'salary.stipend' => ($isSubmitted && $request->job_type === 'INF') ? 'required' : 'nullable',
+            'salary.currency' => 'nullable|string|max:10',
             'salary.internship_duration' => 'nullable|string',
             'salary.fixed_component' => 'nullable|numeric|min:0',
             'salary.joining_bonus' => 'nullable|numeric|min:0',
@@ -64,56 +73,81 @@ class JobController extends Controller
             'eligibility.gender' => 'nullable|in:All,Male,Female,Others',
             'eligibility.slp_requirement' => 'nullable|string',
             'eligibility.disciplines_json' => 'nullable|array',
-            'declaration.agreed' => 'required|boolean',
+            'declaration.agreed' => $isSubmitted ? 'required|boolean' : 'nullable|boolean',
             'declaration.declaration_text' => 'nullable|string',
+            'declaration.aipc_guidelines' => 'nullable|array',
             'stages' => 'nullable|array',
             'stages.*.stage_id' => 'required_with:stages|exists:hiring_stage,stage_id',
             'stages.*.sequence' => 'required_with:stages|integer|min:1',
             'stages.*.duration' => 'nullable|string',
             'stages.*.start_time' => 'nullable|date',
             'stages.*.end_time' => 'nullable|date|after_or_equal:stages.*.start_time',
-        ]);
+        ];
+
+        $data = $request->validate($rules);
 
         if ($user->role === 'recruiter') {
             $data['company_id'] = $user->company_id;
         }
 
         $payload = DB::transaction(function () use ($data) {
-            $job = JobProfile::create([
-                'company_id' => $data['company_id'],
-                'cycle_id' => $data['cycle_id'],
-                'job_type' => $data['job_type'],
-                'profile_name' => $data['profile_name'],
-                'description' => $data['description'],
-                'location' => $data['location'],
-                'training_period' => $data['training_period'] ?? null,
-                'bond' => $data['bond'] ?? null,
-                'registration_link' => $data['registration_link'] ?? null,
-                'joining_month' => $data['joining_month'] ?? null,
-                'onboarding_procedure' => $data['onboarding_procedure'] ?? null,
-                'num_employees' => $data['num_employees'] ?? null,
-                'sector' => $data['sector'] ?? null,
-            ]);
+            $job = JobProfile::updateOrCreate(
+                ['job_id' => $data['job_id'] ?? null],
+                [
+                    'company_id' => $data['company_id'],
+                    'cycle_id' => $data['cycle_id'],
+                    'job_type' => $data['job_type'],
+                    'profile_name' => $data['profile_name'] ?? '',
+                    'description' => $data['description'] ?? '',
+                    'location' => $data['location'] ?? '',
+                    'work_mode' => $data['work_mode'] ?? 'offline',
+                    'offline_job_location' => $data['offline_job_location'] ?? null,
+                    'training_period' => $data['training_period'] ?? null,
+                    'bond' => $data['bond'] ?? null,
+                    'registration_link' => $data['registration_link'] ?? null,
+                    'joining_month' => $data['joining_month'] ?? null,
+                    'onboarding_procedure' => $data['onboarding_procedure'] ?? null,
+                    'num_employees' => $data['num_employees'] ?? null,
+                    'sector' => $data['sector'] ?? null,
+                    'job_categories' => $data['job_categories'] ?? null,
+                    'status' => $data['status'] ?? 'draft',
+                    'last_completed_step' => $data['last_completed_step'] ?? 0,
+                ]
+            );
 
-            Salary::create(array_merge($data['salary'], ['job_id' => $job->job_id]));
-            Eligibility::create(array_merge($data['eligibility'] ?? [], ['job_id' => $job->job_id]));
-            Declaration::create([
-                'job_id' => $job->job_id,
-                'agreed' => $data['declaration']['agreed'],
-                'agreed_at' => $data['declaration']['agreed'] ? now() : null,
-                'agreed_by_user_id' => auth()->id(),
-                'declaration_text' => $data['declaration']['declaration_text'] ?? null,
-            ]);
+            if (isset($data['salary'])) {
+                Salary::updateOrCreate(['job_id' => $job->job_id], $data['salary']);
+            }
+            
+            if (isset($data['eligibility'])) {
+                Eligibility::updateOrCreate(['job_id' => $job->job_id], $data['eligibility']);
+            }
 
-            foreach (($data['stages'] ?? []) as $stage) {
-                JobStage::create([
-                    'job_id' => $job->job_id,
-                    'stage_id' => $stage['stage_id'],
-                    'sequence' => $stage['sequence'],
-                    'duration' => $stage['duration'] ?? null,
-                    'start_time' => $stage['start_time'] ?? null,
-                    'end_time' => $stage['end_time'] ?? null,
-                ]);
+            if (isset($data['declaration'])) {
+                Declaration::updateOrCreate(
+                    ['job_id' => $job->job_id],
+                    [
+                        'agreed' => $data['declaration']['agreed'] ?? false,
+                        'agreed_at' => ($data['declaration']['agreed'] ?? false) ? now() : null,
+                        'agreed_by_user_id' => auth()->id(),
+                        'declaration_text' => $data['declaration']['declaration_text'] ?? null,
+                        'aipc_guidelines_json' => $data['declaration']['aipc_guidelines'] ?? null,
+                    ]
+                );
+            }
+
+            if (isset($data['stages'])) {
+                JobStage::where('job_id', $job->job_id)->delete();
+                foreach ($data['stages'] as $stage) {
+                    JobStage::create([
+                        'job_id' => $job->job_id,
+                        'stage_id' => $stage['stage_id'],
+                        'sequence' => $stage['sequence'],
+                        'duration' => $stage['duration'] ?? null,
+                        'start_time' => $stage['start_time'] ?? null,
+                        'end_time' => $stage['end_time'] ?? null,
+                    ]);
+                }
             }
 
             return $job;

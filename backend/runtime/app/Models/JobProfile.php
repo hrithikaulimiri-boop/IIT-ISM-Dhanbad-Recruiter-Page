@@ -16,7 +16,11 @@ class JobProfile extends Model
         'company_id', 'cycle_id', 'job_type', 'profile_name', 'description',
         'location', 'work_mode', 'offline_job_location',
         'training_period', 'bond', 'registration_link', 'joining_month',
-        'onboarding_procedure'
+        'onboarding_procedure', 'job_categories', 'status', 'last_completed_step'
+    ];
+
+    protected $casts = [
+        'job_categories' => 'array',
     ];
 
     public function stages(): HasMany

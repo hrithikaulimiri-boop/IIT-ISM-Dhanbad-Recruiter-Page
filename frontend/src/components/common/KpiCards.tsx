@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, Grid, Typography } from "@mui/material";
+import { Card, CardContent, Grid2 as Grid, Typography } from "@mui/material";
 
 const cards = [
   { label: "Total Jobs", value: 24 },

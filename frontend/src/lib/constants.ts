@@ -1,3 +1,21 @@
+export const companySectors = [
+  "Software/IT",
+  "Education/Ed Tech",
+  "E-Commerce",
+  "Consulting",
+  "Finance/Banking",
+  "Analytics",
+  "FMCG",
+  "Core",
+  "Media",
+  "Oil & Gas",
+  "Mining",
+  "Construction",
+  "Healthcare",
+  "Research & Development",
+  "Other",
+];
+
 export const defaultHiringStages = [
   "Pre-Placement Talk",
   "Resume Shortlisting",

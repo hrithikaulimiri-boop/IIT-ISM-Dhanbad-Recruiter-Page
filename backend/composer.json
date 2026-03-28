@@ -2,8 +2,8 @@
   "name": "campus/recruitment-backend",
   "type": "project",
   "require": {
-    "php": "^8.2",
-    "laravel/framework": "^11.0",
+    "php": "^8.2.0",
+    "laravel/framework": "^13.2.0",
     "laravel/sanctum": "^4.0",
     "tymon/jwt-auth": "^2.1",
     "maatwebsite/excel": "^3.1"

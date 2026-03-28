@@ -2,112 +2,64 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { AppBar, Avatar, Box, Drawer, IconButton, List, ListItemButton, ListItemText, Toolbar, Typography, Button, ListItemIcon } from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import { signOut, useSession } from "next-auth/react";
-import { LayoutDashboard, Briefcase, GraduationCap, ClipboardList, FileCheck, FileSearch } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { AppBar, Avatar, Box, Toolbar, Typography, Button } from "@mui/material";
 import { motion } from "framer-motion";
 
-const MotionListItemIcon = motion(ListItemIcon);
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = React.useState(true);
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const portalFilter = searchParams.get("portal");
-  const typeFilter = searchParams.get("type");
-  const statusFilter = searchParams.get("status");
   const { data: session, status } = useSession();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
     window.location.href = "/login";
   };
 
-  if (status === "unauthenticated") {
-    return <>{children}</>;
+  // Prevent hydration mismatch by waiting for mount
+  if (!mounted) {
+    return <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>{children}</Box>;
   }
 
-  const isAdmin = (session?.user as any)?.role === "admin";
-
-  const navItems = isAdmin 
-    ? [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/applications", label: "All Submissions", icon: ClipboardList },
-        { href: "/applications?status=in progress", label: "Pending Approval", icon: FileSearch },
-        { href: "/applications?portal=JNF", label: "JNF Submissions", icon: FileCheck },
-        { href: "/applications?portal=INF", label: "INF Submissions", icon: GraduationCap },
-      ]
-    : [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/jobs?type=JNF", label: "JNF Jobs", icon: Briefcase },
-        { href: "/jobs?type=INF", label: "INF Internships", icon: GraduationCap },
-        { href: "/applications", label: "My Applications", icon: ClipboardList },
-        { href: "/applications?portal=JNF", label: "JNF Submissions", icon: FileCheck },
-        { href: "/applications?portal=INF", label: "INF Submissions", icon: FileSearch },
-      ];
+  if (status === "unauthenticated") {
+    return <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>{children}</Box>;
+  }
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
-      <Drawer variant="persistent" open={open} sx={{ "& .MuiDrawer-paper": { width: 260, p: 2 } }}>
-        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }}>
-            ✨
-          </motion.div>
-          Recruiter Suite
-        </Typography>
-        <List>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isSelected = item.href.startsWith("/applications")
-              ? pathname === "/applications" &&
-                (item.href === "/applications"
-                  ? !portalFilter && !statusFilter
-                  : (item.href.includes(`portal=${portalFilter}`) || item.href.includes(`status=${statusFilter}`)))
-              : item.href.startsWith("/jobs")
-                ? pathname === "/jobs" && !!typeFilter && item.href.endsWith(`type=${typeFilter}`)
-              : pathname === item.href;
-
-            return (
-              <ListItemButton
-                key={item.href}
-                component={Link}
-                href={item.href}
-                selected={isSelected}
-                sx={{
-                  borderRadius: 1,
-                  mb: 0.5,
-                  "&.Mui-selected": {
-                    bgcolor: "primary.light",
-                    color: "primary.main",
-                    "& .MuiListItemIcon-root": { color: "primary.main" },
-                  },
-                }}
-              >
-                <MotionListItemIcon
-                  whileHover={{ scale: 1.2, rotate: 10 }}
-                  sx={{ minWidth: 40 }}
-                >
-                  <Icon size={20} />
-                </MotionListItemIcon>
-                <ListItemText primary={item.label} />
-              </ListItemButton>
-            );
-          })}
-        </List>
-      </Drawer>
-
-      <Box sx={{ flexGrow: 1, ml: open ? "260px" : 0, transition: "all 0.2s" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <Box sx={{ flexGrow: 1 }}>
         <AppBar position="sticky" color="transparent" elevation={0}>
           <Toolbar sx={{ backdropFilter: "blur(8px)", bgcolor: "rgba(255,255,255,0.65)" }}>
-            <IconButton onClick={() => setOpen((p) => !p)}><MenuIcon /></IconButton>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>Placement Management</Typography>
-            <Avatar sx={{ mr: 1 }}>{session?.user?.name?.[0] || "R"}</Avatar>
+            <Typography 
+              variant="h6" 
+              component={Link} 
+              href="/dashboard"
+              sx={{ 
+                flexGrow: 1, 
+                textDecoration: 'none', 
+                color: 'inherit',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}
+            >
+              <Box component={motion.div} animate={{ rotate: 360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }}>
+                ✨
+              </Box>
+              IIT-ISM Placement Portal
+            </Typography>
+            <Avatar sx={{ mr: 1, bgcolor: 'primary.main' }}>{(session?.user as any)?.companyName?.[0] || session?.user?.name?.[0] || "R"}</Avatar>
+            <Typography variant="body2" sx={{ mr: 2, fontWeight: 600, color: 'text.secondary' }}>
+              {(session?.user as any)?.companyName || session?.user?.name}
+            </Typography>
             <Button variant="outlined" onClick={handleLogout}>Logout</Button>
           </Toolbar>
         </AppBar>
-        <Box sx={{ p: 3 }}>{children}</Box>
+        <Box sx={{ p: 4, maxWidth: '1400px', mx: 'auto' }}>{children}</Box>
       </Box>
     </Box>
   );

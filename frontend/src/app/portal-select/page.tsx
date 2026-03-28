@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Box, Button, Card, CardContent, Grid, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Grid2 as Grid, Typography } from "@mui/material";
 
 export default function PortalSelectPage() {
   const router = useRouter();

@@ -23,9 +23,11 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
     window.localStorage.setItem("theme-mode", next);
   };
 
-  // Prevent hydration mismatch by only rendering client-specific parts after mount
+  // Prevent hydration mismatch by always rendering light mode on server
+  const theme = React.useMemo(() => getTheme(mounted ? mode : "light"), [mounted, mode]);
+
   return (
-    <ThemeProvider theme={getTheme(mode)}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       {mounted && (
         <IconButton

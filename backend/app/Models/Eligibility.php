@@ -11,4 +11,8 @@ class Eligibility extends Model
     protected $fillable = [
         'job_id', 'min_cgpa', 'gender', 'slp_requirement', 'disciplines_json'
     ];
+
+    protected $casts = [
+        'disciplines_json' => 'array'
+    ];
 }

@@ -13,8 +13,14 @@ class JobProfile extends Model
 
     protected $fillable = [
         'company_id', 'cycle_id', 'job_type', 'profile_name', 'description',
-        'location', 'training_period', 'bond', 'registration_link', 'joining_month',
-        'onboarding_procedure', 'num_employees', 'sector'
+        'location', 'work_mode', 'offline_job_location',
+        'training_period', 'bond', 'registration_link', 'joining_month',
+        'onboarding_procedure', 'num_employees', 'sector', 'job_categories',
+        'status', 'last_completed_step'
+    ];
+
+    protected $casts = [
+        'job_categories' => 'array',
     ];
 
     public function stages(): HasMany

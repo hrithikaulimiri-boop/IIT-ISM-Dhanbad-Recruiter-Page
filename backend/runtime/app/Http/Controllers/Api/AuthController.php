@@ -13,8 +13,57 @@ use Illuminate\Support\Facades\Mail;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Throwable;
 
+use Illuminate\Support\Facades\Auth;
+use App\Mail\RegisterOtpMail;
+use App\Mail\RegistrationSuccessfulMail;
+use App\Mail\PasswordResetOtpMail;
+use Illuminate\Support\Facades\Cache;
+
 class AuthController extends Controller
 {
+    public function registerRequest(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email|unique:users,email',
+        ]);
+
+        $otp = rand(100000, 999999);
+        Cache::put('otp_'.$data['email'], $otp, now()->addMinutes(10));
+
+        try {
+            Mail::to($data['email'])->send(new RegisterOtpMail($otp));
+            Log::info("OTP for {$data['email']}: $otp");
+        } catch (Throwable $e) {
+            Log::error("Failed to send OTP: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to send OTP. Please check your email configuration.'], 500);
+        }
+
+        return response()->json(['message' => 'OTP sent successfully.']);
+    }
+
+    public function verifyOtp(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required|string|size:6',
+            'registration_data' => 'required|array',
+        ]);
+
+        $storedOtp = Cache::get('otp_'.$data['email']);
+        if (!$storedOtp || $data['otp'] !== (string)$storedOtp) {
+            return response()->json(['message' => 'Wrong OTP entered. Please try again.'], 422);
+        }
+
+        Cache::forget('otp_'.$data['email']);
+
+        return $this->register($request->merge($data['registration_data']));
+    }
+
+    public function resendOtp(Request $request)
+    {
+        return $this->registerRequest($request);
+    }
+
     public function register(Request $request)
     {
         $request->merge([
@@ -29,6 +78,7 @@ class AuthController extends Controller
             'company_name' => 'required|string|max:255',
             'street' => 'required|string|max:255',
             'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
             'country' => 'required|string|max:100',
             'pincode' => 'required|string|max:20',
             'postal_address' => 'required|string|max:500',
@@ -37,27 +87,27 @@ class AuthController extends Controller
             'company_website' => 'required|url|max:255',
             'company_social_media' => 'nullable|string|max:255',
             'company_established_year' => 'required|integer|min:1800|max:2100',
+            'company_turnover' => 'required|string|max:255',
+            'num_employees' => 'required|integer|min:1',
+            'company_sectors' => 'required|array|min:1',
             'contact_hr.name' => 'required|string|max:255',
             'contact_hr.designation' => 'required|string|max:255',
             'contact_hr.email' => 'required|email|max:255',
             'contact_hr.phone' => 'required|string|max:20',
-            'contact_hr.company_name' => 'nullable|string|max:255',
             'contact_2.name' => 'required|string|max:255',
             'contact_2.designation' => 'required|string|max:255',
             'contact_2.email' => 'required|email|max:255',
             'contact_2.phone' => 'required|string|max:20',
-            'contact_2.company_name' => 'nullable|string|max:255',
             'contact_3.name' => 'nullable|string|max:255',
             'contact_3.designation' => 'required_with:contact_3.name|nullable|string|max:255',
             'contact_3.email' => 'required_with:contact_3.name|nullable|email|max:255',
             'contact_3.phone' => 'required_with:contact_3.name|nullable|string|max:20',
-            'contact_3.company_name' => 'nullable|string|max:255',
         ]);
 
-        if (!$this->designationLooksLikeHeadOfHr($data['contact_hr']['designation'])) {
+        if (!$this->designationLooksLikeTalentAcquisition($data['contact_hr']['designation'])) {
             return response()->json([
-                'message' => 'The HR contact must be designated as Head of HR (or equivalent, e.g. Chief Human Resources Officer).',
-                'errors' => ['contact_hr.designation' => ['Must be a Head of HR role.']],
+                'message' => 'The lead contact must be designated as Head of Talent Acquisition (or equivalent).',
+                'errors' => ['contact_hr.designation' => ['Must be a Talent Acquisition lead role.']],
             ], 422);
         }
 
@@ -73,6 +123,7 @@ class AuthController extends Controller
             [
                 'street' => $data['street'],
                 'city' => $data['city'],
+                'state' => $data['state'],
                 'country' => $data['country'],
                 'pincode' => $data['pincode'],
                 'postal_address' => $data['postal_address'],
@@ -81,12 +132,16 @@ class AuthController extends Controller
                 'website' => $data['company_website'],
                 'social_media' => $data['company_social_media'] ?? null,
                 'established_year' => $data['company_established_year'],
+                'annual_turnover' => $data['company_turnover'],
+                'num_employees' => $data['num_employees'],
+                'sectors' => $data['company_sectors'],
             ]
         );
 
         if (!$company->wasRecentlyCreated) {
             $company->street = $data['street'];
             $company->city = $data['city'];
+            $company->state = $data['state'];
             $company->country = $data['country'];
             $company->pincode = $data['pincode'];
             $company->postal_address = $data['postal_address'];
@@ -95,6 +150,9 @@ class AuthController extends Controller
             $company->website = $data['company_website'];
             $company->social_media = $data['company_social_media'] ?? null;
             $company->established_year = $data['company_established_year'];
+            $company->annual_turnover = $data['company_turnover'];
+            $company->num_employees = $data['num_employees'];
+            $company->sectors = $data['company_sectors'];
             $company->save();
         }
 
@@ -108,6 +166,12 @@ class AuthController extends Controller
         ]);
 
         $this->syncRegistrationContacts($company->company_id, $data['company_name'], $data);
+
+        try {
+            Mail::to($user->email)->send(new RegistrationSuccessfulMail($user, $company));
+        } catch (Throwable $e) {
+            Log::warning('Registration success mail failed: '.$e->getMessage());
+        }
 
         try {
             Mail::raw(
@@ -125,13 +189,13 @@ class AuthController extends Controller
         return response()->json(['message' => 'Registration completed successfully.'], 201);
     }
 
-    private function designationLooksLikeHeadOfHr(string $designation): bool
+    private function designationLooksLikeTalentAcquisition(string $designation): bool
     {
         $d = mb_strtolower($designation);
-        $hasHr = str_contains($d, 'hr') || str_contains($d, 'human resource');
-        $hasHeadRole = (bool) preg_match('/\b(head|chief|director|vp|vice president|manager)\b/', $d);
+        $hasTa = str_contains($d, 'talent') || str_contains($d, 'acquisition') || str_contains($d, 'hr') || str_contains($d, 'human resource');
+        $hasHeadRole = (bool) preg_match('/\b(head|chief|director|vp|vice president|manager|lead)\b/', $d);
 
-        return $hasHr && $hasHeadRole;
+        return $hasTa && $hasHeadRole;
     }
 
     /**
@@ -155,7 +219,7 @@ class AuthController extends Controller
             }
             ContactPerson::create([
                 'company_id' => $companyId,
-                'employer_company_name' => $row['company_name'] ?? $defaultEmployerName,
+                'employer_company_name' => $defaultEmployerName,
                 'name' => $row['name'] ?? '',
                 'designation' => $row['designation'] ?? '',
                 'email' => $row['email'] ?? '',
@@ -172,21 +236,28 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!$token = JWTAuth::attempt($credentials)) {
+        if (!$token = auth('api')->attempt($credentials)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        $user = auth('api')->user();
+
+        if ($user->role === 'recruiter' && !$user->is_approved) {
+            auth('api')->logout();
+            return response()->json(['message' => 'Your account is pending approval by the placement admin.'], 403);
         }
 
         return response()->json([
             'data' => [
                 'token' => $token,
-                'user' => auth()->user(),
+                'user' => $user,
             ]
         ]);
     }
 
     public function me()
     {
-        return response()->json(['data' => auth()->user()]);
+        return response()->json(['data' => auth('api')->user()]);
     }
 
     public function logout()
@@ -195,4 +266,45 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out']);
     }
 
+    public function forgotPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $otp = rand(100000, 999999);
+        Cache::put('password_reset_otp_'.$data['email'], $otp, now()->addMinutes(10));
+
+        try {
+            Mail::to($data['email'])->send(new PasswordResetOtpMail($otp));
+            Log::info("Password reset OTP for {$data['email']}: $otp");
+        } catch (Throwable $e) {
+            Log::error("Failed to send password reset OTP: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to send OTP. Please check your email configuration.'], 500);
+        }
+
+        return response()->json(['message' => 'OTP sent successfully.']);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'otp' => 'required|string|size:6',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $storedOtp = Cache::get('password_reset_otp_'.$data['email']);
+        if (!$storedOtp || $data['otp'] !== (string)$storedOtp) {
+            return response()->json(['message' => 'Wrong OTP entered. Please try again.'], 422);
+        }
+
+        $user = User::where('email', $data['email'])->first();
+        $user->password = Hash::make($data['password']);
+        $user->save();
+
+        Cache::forget('password_reset_otp_'.$data['email']);
+
+        return response()->json(['message' => 'Password reset successfully.']);
+    }
 }

@@ -18,10 +18,19 @@ class DatabaseSeeder extends Seeder
             'sector' => 'Technology',
         ]);
 
-        User::firstOrCreate(['email' => 'admin@campus.local'], [
+        User::firstOrCreate(['email' => '24je0900@iitism.ac.in'], [
             'name' => 'Placement Admin',
             'password' => Hash::make('Admin@12345'),
             'role' => 'admin',
+            'is_approved' => true,
+            'company_id' => $company->company_id,
+            'portal_type' => 'JNF',
+        ]);
+
+        User::firstOrCreate(['email' => 'recruiter@demo.com'], [
+            'name' => 'Demo Recruiter',
+            'password' => Hash::make('Recruiter@12345'),
+            'role' => 'recruiter',
             'is_approved' => true,
             'company_id' => $company->company_id,
             'portal_type' => 'JNF',

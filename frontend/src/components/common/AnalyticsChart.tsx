@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, Typography } from "@mui/material";
+import { Card, CardContent, Typography, Box } from "@mui/material";
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from "recharts";
 
 const data = [
@@ -15,7 +15,7 @@ export default function AnalyticsChart() {
     <Card sx={{ mt: 2 }}>
       <CardContent>
         <Typography variant="h6" sx={{ mb: 2 }}>Application Trend</Typography>
-        <div style={{ width: "100%", height: 280 }}>
+        <Box sx={{ width: "100%", height: 280 }}>
           <ResponsiveContainer>
             <AreaChart data={data}>
               <XAxis dataKey="month" />
@@ -23,7 +23,7 @@ export default function AnalyticsChart() {
               <Area type="monotone" dataKey="apps" stroke="#6366F1" fill="#A78BFA" />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </Box>
       </CardContent>
     </Card>
   );

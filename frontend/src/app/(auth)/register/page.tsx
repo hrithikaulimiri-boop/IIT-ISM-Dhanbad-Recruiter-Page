@@ -1,15 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { Box, Button, Grid, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Button, Grid2 as Grid, MenuItem, Paper, Stack, TextField, Typography, Container, InputAdornment, OutlinedInput, Select, FormControl, InputLabel, Chip } from "@mui/material";
 import { AxiosError } from "axios";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { companyCountries } from "@/lib/constants";
+import { companyCountries, companySectors } from "@/lib/constants";
+import { motion, AnimatePresence } from "framer-motion";
+import { GraduationCap, Building2, Sparkles, User, Mail, Lock, MapPin, Globe, Phone, Calendar } from "lucide-react";
+
+const FloatingIcon = ({ children, delay = 0, initialX = 0, initialY = 0 }: { children: React.ReactNode, delay?: number, initialX?: number, initialY?: number }) => (
+  <Box
+    component={motion.div}
+    initial={{ x: initialX, y: initialY, opacity: 0 }}
+    animate={{ 
+      y: [initialY, initialY - 20, initialY],
+      opacity: [0.2, 0.5, 0.2],
+    }}
+    transition={{ 
+      duration: 4, 
+      repeat: Infinity, 
+      delay,
+      ease: "easeInOut" 
+    }}
+    sx={{ position: 'absolute', color: 'rgba(25, 118, 210, 0.2)' }}
+  >
+    {children}
+  </Box>
+);
 
 export default function RegisterPage() {
   const router = useRouter();
-  const emptyContact = () => ({ name: "", designation: "", email: "", phone: "", company_name: "" });
+  const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState<"login" | "register">("register");
+  
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const emptyContact = () => ({ name: "", designation: "", email: "", phone: "" });
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -17,6 +46,7 @@ export default function RegisterPage() {
     company_name: "",
     street: "",
     city: "",
+    state: "",
     country: "India",
     pincode: "",
     postal_address: "",
@@ -25,13 +55,32 @@ export default function RegisterPage() {
     company_website: "",
     company_social_media: "",
     company_established_year: "",
-    contact_hr: { ...emptyContact(), designation: "Head of HR" },
+    company_turnover: "",
+    num_employees: "",
+    company_sectors: [] as string[],
+    contact_hr: { ...emptyContact(), designation: "Head of Talent Acquisition" },
     contact_2: emptyContact(),
     contact_3: emptyContact(),
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationMode, setVerificationMode] = useState(false);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [timer, setTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (verificationMode && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (timer === 0) {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [verificationMode, timer]);
 
   const handleAutofillHR = () => {
     setForm((prev) => ({
@@ -42,6 +91,14 @@ export default function RegisterPage() {
         email: prev.email,
         phone: prev.phone,
       },
+    }));
+  };
+
+  const handleAutofillPostalAddress = () => {
+    const fullAddress = `${form.street}, ${form.city}, ${form.state}, ${form.country} - ${form.pincode}`;
+    setForm((prev) => ({
+      ...prev,
+      postal_address: fullAddress,
     }));
   };
 
@@ -88,23 +145,6 @@ export default function RegisterPage() {
       ? true
       : contactOk(form.contact_3);
 
-  const isFormValid =
-    form.name.trim().length > 0 &&
-    form.company_name.trim().length > 0 &&
-    form.street.trim().length > 0 &&
-    form.city.trim().length > 0 &&
-    form.country.trim().length > 0 &&
-    form.pincode.trim().length > 0 &&
-    form.postal_address.trim().length > 0 &&
-    form.phone.trim().length > 0 &&
-    /^\d{4}$/.test(form.company_established_year) &&
-    isWebsitePlausible(form.company_website) &&
-    /^\S+@\S+\.\S+$/.test(form.email) &&
-    form.password.length >= 8 &&
-    contactOk(form.contact_hr) &&
-    contactOk(form.contact_2) &&
-    contact3Ok;
-
   const getValidationError = () => {
     if (form.name.trim().length === 0) return "Contact name is required";
     if (form.email.trim().length === 0) return "Email is required";
@@ -117,8 +157,12 @@ export default function RegisterPage() {
     if (form.pincode.trim().length === 0) return "Pincode is required";
     if (form.postal_address.trim().length === 0) return "Postal address is required";
     if (form.phone.trim().length === 0) return "Phone number is required";
-    if (!/^\d{4}$/.test(form.company_established_year)) return "Establishment year must be exactly 4 digits (e.g. 1926)";
+    const estYear = Number(form.company_established_year);
+    if (!/^\d{4}$/.test(form.company_established_year) || estYear < 1800) return "Establishment year must be 4 digits and 1800 or later";
     if (!isWebsitePlausible(form.company_website)) return "Company website is invalid (e.g. company.com)";
+    if (form.company_turnover.trim().length === 0) return "Company turnover is required";
+    if (form.num_employees.trim().length === 0) return "Number of employees is required";
+    if (form.company_sectors.length === 0) return "At least one company sector is required";
     if (!contactOk(form.contact_hr)) return "Contact person 1 details are incomplete or email is invalid";
     if (!contactOk(form.contact_2)) return "Contact person 2 details are incomplete or email is invalid";
     if (!contact3Ok) return "Contact person 3 details are incomplete or email is invalid";
@@ -145,205 +189,564 @@ export default function RegisterPage() {
           ? normalizeWebsiteUrl(socialRaw)
           : socialRaw,
         company_established_year: Number(form.company_established_year),
-        contact_hr: {
-          ...form.contact_hr,
-          company_name: form.contact_hr.company_name.trim() || undefined,
-        },
-        contact_2: {
-          ...form.contact_2,
-          company_name: form.contact_2.company_name.trim() || undefined,
-        },
-        contact_3: {
-          ...form.contact_3,
-          name: form.contact_3.name.trim() || undefined,
-          designation: form.contact_3.designation.trim() || undefined,
-          email: form.contact_3.email.trim() || undefined,
-          phone: form.contact_3.phone.trim() || undefined,
-          company_name: form.contact_3.company_name.trim() || undefined,
-        },
       };
-      await api.post("/auth/register", payload);
-      setMessage("Registration successful. You can now login.");
-      setTimeout(() => router.push("/login"), 1000);
+      await api.post("/auth/register-request", payload);
+      setVerificationMode(true);
+      setTimer(60);
+      setCanResend(false);
+      setMessage("Verification code sent to your email.");
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
-      const apiMessage = axiosErr.response?.data?.message;
-      const validationErrors = axiosErr.response?.data?.errors;
-      const firstValidationMessage = validationErrors
-        ? Object.values(validationErrors).flat()[0]
-        : undefined;
-
-      const netMsg =
-        axiosErr.code === "ERR_NETWORK" || !axiosErr.response
-          ? "Cannot reach the API. Start the backend (php artisan serve on port 8000) and ensure NEXT_PUBLIC_API_BASE_URL matches."
-          : undefined;
-      setError(firstValidationMessage || apiMessage || netMsg || "Registration failed. Please check your details and try again.");
+      setError(axiosErr.response?.data?.message || "Registration failed. Please check your details.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleVerifyOtp = async () => {
+    const code = otp.join("");
+    if (code.length < 6) {
+      setError("Please enter the 6-digit OTP.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await api.post("/auth/verify-otp", { email: form.email, otp: code, registration_data: form });
+      setMessage("Account registered successfully! Redirecting to login...");
+      setTimeout(() => router.push("/login"), 2000);
+    } catch (err) {
+      setError("Wrong OTP entered. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!canResend) return;
+    setError("");
+    setMessage("Sending new OTP...");
+    try {
+      await api.post("/auth/resend-otp", { email: form.email });
+      setTimer(60);
+      setCanResend(false);
+      setMessage("New OTP sent to your email.");
+    } catch (err) {
+      setError("Failed to resend OTP.");
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  if (!mounted) {
+    return (
+      <Box sx={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        background: "linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)"
+      }} />
+    );
+  }
+
   return (
-    <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 2 }}>
-      <Paper sx={{ p: 4, width: "100%", maxWidth: 980 }}>
-        <Stack spacing={2}>
-          <Typography variant="h5">Recruiter Registration</Typography>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Contact Name" fullWidth inputProps={{ maxLength: 255 }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Email" fullWidth inputProps={{ maxLength: 255 }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Password" type="password" fullWidth inputProps={{ maxLength: 128 }} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Company Name" fullWidth inputProps={{ maxLength: 255 }} value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Street" fullWidth inputProps={{ maxLength: 255 }} value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="City" fullWidth inputProps={{ maxLength: 100 }} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                required
-                select
-                label="Country"
-                fullWidth
-                value={form.country}
-                onChange={(e) => setForm({ ...form, country: e.target.value })}
-              >
-                {companyCountries.map((country) => (
-                  <MenuItem key={country} value={country}>{country}</MenuItem>
-                ))}
-          </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Pincode" fullWidth inputProps={{ maxLength: 20 }} value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Postal Address" fullWidth inputProps={{ maxLength: 500 }} value={form.postal_address} onChange={(e) => setForm({ ...form, postal_address: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Phone Number" fullWidth inputProps={{ maxLength: 20 }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Landline (optional)" fullWidth inputProps={{ maxLength: 20 }} value={form.landline} onChange={(e) => setForm({ ...form, landline: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                required
-                label="Company Website"
-                fullWidth
-                placeholder="https://company.com or company.com"
-                helperText="https:// is added if missing. Localhost URLs are OK for testing."
-                inputProps={{ maxLength: 255 }}
-                value={form.company_website}
-                onChange={(e) => setForm({ ...form, company_website: e.target.value })}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Company Social Media (optional)" fullWidth inputProps={{ maxLength: 255 }} value={form.company_social_media} onChange={(e) => setForm({ ...form, company_social_media: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Year of Establishment" type="number" fullWidth value={form.company_established_year} onChange={(e) => setForm({ ...form, company_established_year: e.target.value })} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Typography variant="subtitle1" sx={{ mt: 1 }}>Contact persons (Head of HR required; two compulsory; third optional)</Typography>
-              <Typography variant="body2" color="text.secondary">Use designation such as &quot;Head of HR&quot; or &quot;Chief Human Resources Officer&quot; for the HR lead.</Typography>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Stack direction="row" spacing={2} sx={{ alignItems: "center", mt: 1 }}>
-                <Typography variant="subtitle2">1 — Head of HR (compulsory)</Typography>
-                <Button size="small" variant="outlined" onClick={handleAutofillHR} sx={{ textTransform: 'none' }}>
-                  Autofill from above registrant details
-                </Button>
-              </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Name" fullWidth value={form.contact_hr.name} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, name: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Designation" fullWidth value={form.contact_hr.designation} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, designation: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Company name (if different)" fullWidth value={form.contact_hr.company_name} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, company_name: e.target.value } })} helperText="Leave blank to use registered company name" />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Phone" fullWidth value={form.contact_hr.phone} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, phone: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Email" fullWidth value={form.contact_hr.email} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, email: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Stack direction="row" spacing={2} sx={{ alignItems: "center", mt: 1 }}>
-                <Typography variant="subtitle2">2 — Second contact (compulsory)</Typography>
-                <Button size="small" variant="outlined" onClick={() => handleCopyContact("contact_2", "contact_hr")} sx={{ textTransform: 'none' }}>
-                  Copy from HR Lead
-                </Button>
-              </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Name" fullWidth value={form.contact_2.name} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, name: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Designation" fullWidth value={form.contact_2.designation} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, designation: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Company name (if different)" fullWidth value={form.contact_2.company_name} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, company_name: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Phone" fullWidth value={form.contact_2.phone} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, phone: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField required label="Email" fullWidth value={form.contact_2.email} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, email: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <Stack direction="row" spacing={2} sx={{ alignItems: "center", mt: 1 }}>
-                <Typography variant="subtitle2">3 — Third contact (optional)</Typography>
-                <Button size="small" variant="outlined" onClick={() => handleCopyContact("contact_3", "contact_2")} sx={{ textTransform: 'none' }}>
-                  Copy from Second Contact
-                </Button>
-              </Stack>
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Name" fullWidth value={form.contact_3.name} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, name: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Designation" fullWidth value={form.contact_3.designation} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, designation: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Company name (if different)" fullWidth value={form.contact_3.company_name} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, company_name: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Phone" fullWidth value={form.contact_3.phone} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, phone: e.target.value } })} />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Email" fullWidth value={form.contact_3.email} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, email: e.target.value } })} />
-            </Grid>
-          </Grid>
-          {message ? <Typography color="success.main" align="center">{message}</Typography> : null}
-          {error ? <Typography color="error" align="center">{error}</Typography> : null}
-          <Button 
-            variant="contained" 
-            size="large"
-            onClick={submit} 
-            disabled={isSubmitting}
+    <Box sx={{ 
+      minHeight: "100vh", 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center",
+      background: "linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)",
+      position: 'relative',
+      overflowX: 'hidden',
+      py: 8
+    }}>
+      {/* Animated Background Elements */}
+      <FloatingIcon delay={0} initialX={100} initialY={100}><GraduationCap size={120} /></FloatingIcon>
+      <FloatingIcon delay={1} initialX={-200} initialY={300}><Building2 size={80} /></FloatingIcon>
+      <FloatingIcon delay={2} initialX={300} initialY={-200}><Sparkles size={100} /></FloatingIcon>
+
+      <Container maxWidth="lg">
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                letterSpacing: 4, 
+                color: "text.secondary", 
+                fontWeight: 300,
+                mb: 1,
+                textTransform: 'uppercase'
+              }}
+            >
+              Welcome
+            </Typography>
+            <Typography 
+              variant="h3" 
+              component="h1" 
+              sx={{ 
+                fontWeight: 800, 
+                color: "#004d40", 
+                mb: 1,
+                fontSize: { xs: '2rem', md: '3rem' },
+                letterSpacing: -0.5
+              }}
+            >
+              IIT-ISM DHANBAD
+            </Typography>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 400, 
+                color: "#00796b", 
+                letterSpacing: 1,
+                opacity: 0.8
+              }}
+            >
+              RECRUITER PORTAL
+            </Typography>
+          </Box>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
+          <Paper 
+            elevation={0} 
             sx={{ 
-              py: 1.5,
-              borderRadius: 2,
-              textTransform: 'none',
-              fontSize: '1.1rem',
-              boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)'
+              p: { xs: 3, md: 6 }, 
+              borderRadius: 8,
+              backdropFilter: "blur(20px)",
+              bgcolor: "rgba(255, 255, 255, 0.75)",
+              border: "1px solid rgba(255, 255, 255, 0.5)",
+              boxShadow: '0 20px 60px rgba(0,0,0,0.05)'
             }}
           >
-            {isSubmitting ? "Submitting..." : "Create account"}
-          </Button>
-        </Stack>
-      </Paper>
+            {verificationMode ? (
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: '#004d40' }}>
+                  Complete Email Verification
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 4, color: 'text.secondary' }}>
+                  Enter the 6 digit OTP sent to your email for verification
+                </Typography>
+                
+                <Stack direction="row" spacing={2} justifyContent="center" sx={{ mb: 4 }}>
+                  {otp.map((digit, idx) => (
+                    <TextField
+                      key={idx}
+                      id={`otp-${idx}`}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(idx, e)}
+                      inputProps={{ 
+                        maxLength: 1
+                      }}
+                      sx={{ 
+                        width: { xs: 45, sm: 60 },
+                        '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: 'rgba(255,255,255,0.5)' },
+                        '& .MuiInputBase-input': { textAlign: 'center', fontSize: '1.5rem', fontWeight: 700, padding: '12px' }
+                      }}
+                    />
+                  ))}
+                </Stack>
+
+                <Typography variant="body2" sx={{ mb: 4, color: 'text.secondary', fontWeight: 500 }}>
+                  {timer > 0 ? (
+                    `Resend OTP in ${timer} seconds`
+                  ) : (
+                    <Button 
+                      onClick={handleResendOtp} 
+                      disabled={!canResend}
+                      sx={{ color: '#00796b', fontWeight: 700, textTransform: 'none' }}
+                    >
+                      Resend OTP
+                    </Button>
+                  )}
+                </Typography>
+
+                <Button 
+                  fullWidth
+                  variant="contained" 
+                  size="large"
+                  onClick={handleVerifyOtp}
+                  disabled={isSubmitting}
+                  sx={{ 
+                    py: 2,
+                    borderRadius: 4,
+                    textTransform: 'none',
+                    fontSize: '1.2rem',
+                    bgcolor: '#00796b',
+                    fontWeight: 700,
+                    boxShadow: '0 10px 20px rgba(0,121,107,0.2)',
+                    '&:hover': { bgcolor: '#00695c' }
+                  }}
+                >
+                  {isSubmitting ? "Verifying..." : "Complete Verification"}
+                </Button>
+
+                {error && (
+                  <Typography color="error" sx={{ mt: 3, fontWeight: 600 }}>
+                    {error}
+                  </Typography>
+                )}
+                {message && (
+                  <Typography color="success.main" sx={{ mt: 3, fontWeight: 600 }}>
+                    {message}
+                  </Typography>
+                )}
+              </Box>
+            ) : (
+              <>
+                {/* Tab Toggle */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  bgcolor: 'rgba(0,0,0,0.03)', 
+                  borderRadius: 4, 
+                  p: 0.5, 
+                  mb: 6,
+                  maxWidth: 400,
+                  mx: 'auto'
+                }}>
+                  <Button
+                    fullWidth
+                    onClick={() => router.push("/login")}
+                    sx={{ 
+                      borderRadius: 3.5, 
+                      py: 1.5,
+                      color: "text.secondary",
+                      bgcolor: "transparent",
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' },
+                      transition: 'all 0.3s ease',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Login Account
+                  </Button>
+                  <Button
+                    fullWidth
+                    onClick={() => setActiveTab("register")}
+                    sx={{ 
+                      borderRadius: 3.5, 
+                      py: 1.5,
+                      color: activeTab === "register" ? "#fff" : "text.secondary",
+                      bgcolor: activeTab === "register" ? "#00796b" : "transparent",
+                      '&:hover': { bgcolor: activeTab === "register" ? "#00695c" : 'rgba(0,0,0,0.05)' },
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    Register Account
+                  </Button>
+                </Box>
+
+                <Stack spacing={4}>
+                  <Box>
+                    <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#004d40', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <User size={24} /> Basic Information
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          required 
+                          label="Contact Name" 
+                          fullWidth 
+                          value={form.name} 
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          sx={inputStyles}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          required 
+                          label="Email" 
+                          fullWidth 
+                          value={form.email} 
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          sx={inputStyles}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          required 
+                          label="Password" 
+                          type="password" 
+                          fullWidth 
+                          value={form.password} 
+                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                          sx={inputStyles}
+                        />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField 
+                          required 
+                          label="Company Name" 
+                          fullWidth 
+                          value={form.company_name} 
+                          onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                          sx={inputStyles}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#004d40', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <MapPin size={24} /> Company Details
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="Street" fullWidth value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="City" fullWidth value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="State" fullWidth value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                          required
+                          select
+                          label="Country"
+                          fullWidth
+                          value={form.country}
+                          onChange={(e) => setForm({ ...form, country: e.target.value })}
+                          sx={inputStyles}
+                        >
+                          {companyCountries.map((country) => (
+                            <MenuItem key={country} value={country}>{country}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="Pincode" fullWidth value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Stack direction="row" spacing={2} sx={{ mb: 1, alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>Postal Address*</Typography>
+                          <Button size="small" onClick={handleAutofillPostalAddress} sx={{ textTransform: 'none', color: '#00796b' }}>
+                            Autofill from company address
+                          </Button>
+                        </Stack>
+                        <TextField required fullWidth multiline rows={2} value={form.postal_address} onChange={(e) => setForm({ ...form, postal_address: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#004d40', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Globe size={24} /> Online Presence & Financials
+                    </Typography>
+                    <Grid container spacing={3}>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="Phone Number" fullWidth value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField label="Landline (optional)" fullWidth value={form.landline} onChange={(e) => setForm({ ...form, landline: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField required label="Company Website" fullWidth value={form.company_website} onChange={(e) => setForm({ ...form, company_website: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField label="Social Media (optional)" fullWidth value={form.company_social_media} onChange={(e) => setForm({ ...form, company_social_media: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField required label="Year of Establishment" type="number" fullWidth value={form.company_established_year} onChange={(e) => setForm({ ...form, company_established_year: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField required label="Turnover" fullWidth value={form.company_turnover} onChange={(e) => setForm({ ...form, company_turnover: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12, md: 4 }}>
+                        <TextField required label="Number of Employees" type="number" fullWidth value={form.num_employees} onChange={(e) => setForm({ ...form, num_employees: e.target.value })} sx={inputStyles} />
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <FormControl fullWidth sx={inputStyles}>
+                          <InputLabel id="sectors-label">Category/Sector of Company*</InputLabel>
+                          <Select
+                            labelId="sectors-label"
+                            multiple
+                            value={form.company_sectors}
+                            onChange={(e) => setForm({ ...form, company_sectors: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value })}
+                            input={<OutlinedInput label="Category/Sector of Company*" />}
+                            renderValue={(selected) => (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {selected.map((value) => (
+                                  <Chip key={value} label={value} size="small" />
+                                ))}
+                              </Box>
+                            )}
+                          >
+                            {companySectors.map((sector) => (
+                              <MenuItem key={sector} value={sector}>
+                                {sector}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                    </Grid>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h5" sx={{ mb: 1, fontWeight: 700, color: '#004d40', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Phone size={24} /> Contact Persons
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                      At least two contact persons are compulsory.
+                    </Typography>
+                    
+                    <Stack spacing={4}>
+                      <Box sx={{ p: 3, bgcolor: 'rgba(0, 121, 107, 0.03)', borderRadius: 4, border: '1px solid rgba(0, 121, 107, 0.1)' }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#00796b' }}>1. Head of Talent Acquisition (Compulsory)</Typography>
+                          <Button size="small" variant="text" onClick={handleAutofillHR} sx={{ textTransform: 'none', color: '#00796b', fontWeight: 600 }}>
+                            Autofill from registrant
+                          </Button>
+                        </Stack>
+                        <Grid container spacing={3}>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Name" fullWidth value={form.contact_hr.name} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, name: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Designation" fullWidth value={form.contact_hr.designation} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, designation: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Phone" fullWidth value={form.contact_hr.phone} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, phone: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Email" fullWidth value={form.contact_hr.email} onChange={(e) => setForm({ ...form, contact_hr: { ...form.contact_hr, email: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                        </Grid>
+                      </Box>
+
+                      <Box sx={{ p: 3, bgcolor: 'rgba(0, 121, 107, 0.03)', borderRadius: 4, border: '1px solid rgba(0, 121, 107, 0.1)' }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#00796b' }}>2. Second Contact (Compulsory)</Typography>
+                          <Button size="small" variant="text" onClick={() => handleCopyContact("contact_2", "contact_hr")} sx={{ textTransform: 'none', color: '#00796b', fontWeight: 600 }}>
+                            Copy from Lead
+                          </Button>
+                        </Stack>
+                        <Grid container spacing={3}>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Name" fullWidth value={form.contact_2.name} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, name: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Designation" fullWidth value={form.contact_2.designation} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, designation: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Phone" fullWidth value={form.contact_2.phone} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, phone: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField required label="Email" fullWidth value={form.contact_2.email} onChange={(e) => setForm({ ...form, contact_2: { ...form.contact_2, email: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                        </Grid>
+                      </Box>
+
+                      <Box sx={{ p: 3, bgcolor: 'rgba(0, 121, 107, 0.03)', borderRadius: 4, border: '1px solid rgba(0, 121, 107, 0.1)' }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#00796b' }}>3. Third Contact (Optional)</Typography>
+                          <Button size="small" variant="text" onClick={() => handleCopyContact("contact_3", "contact_2")} sx={{ textTransform: 'none', color: '#00796b', fontWeight: 600 }}>
+                            Copy from Second Contact
+                          </Button>
+                        </Stack>
+                        <Grid container spacing={3}>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField label="Name" fullWidth value={form.contact_3.name} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, name: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField label="Designation" fullWidth value={form.contact_3.designation} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, designation: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField label="Phone" fullWidth value={form.contact_3.phone} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, phone: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                          <Grid size={{ xs: 12, md: 6 }}>
+                            <TextField label="Email" fullWidth value={form.contact_3.email} onChange={(e) => setForm({ ...form, contact_3: { ...form.contact_3, email: e.target.value } })} sx={inputStyles} />
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    </Stack>
+                  </Box>
+
+                  {error && (
+                    <Typography color="error" align="center" sx={{ fontWeight: 600 }}>
+                      {error}
+                    </Typography>
+                  )}
+
+                  <Button 
+                    variant="contained" 
+                    size="large"
+                    onClick={submit} 
+                    disabled={isSubmitting}
+                    sx={{ 
+                      py: 2,
+                      borderRadius: 4,
+                      textTransform: 'none',
+                      fontSize: '1.2rem',
+                      bgcolor: '#00796b',
+                      fontWeight: 700,
+                      boxShadow: '0 10px 20px rgba(0,121,107,0.2)',
+                      '&:hover': { bgcolor: '#00695c', boxShadow: '0 12px 24px rgba(0,121,107,0.3)' }
+                    }}
+                  >
+                    {isSubmitting ? "Processing..." : "Complete Email Verification"}
+                  </Button>
+                </Stack>
+              </>
+            )}
+          </Paper>
+        </motion.div>
+
+        <Box sx={{ mt: 8, textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", opacity: 0.7, letterSpacing: 1 }}>
+            © 2026 IIT-ISM DHANBAD PLACEMENT CELL
+          </Typography>
+        </Box>
+      </Container>
     </Box>
   );
 }
+
+const inputStyles = {
+  '& .MuiOutlinedInput-root': { 
+    borderRadius: 3,
+    bgcolor: 'rgba(255,255,255,0.4)',
+    transition: 'all 0.2s',
+    '&:hover': {
+      bgcolor: 'rgba(255,255,255,0.6)',
+    },
+    '&.Mui-focused': {
+      bgcolor: 'rgba(255,255,255,0.8)',
+    }
+  }
+};
+

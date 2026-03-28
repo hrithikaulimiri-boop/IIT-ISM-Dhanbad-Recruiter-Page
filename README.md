@@ -70,7 +70,7 @@ Fields and sections are mapped from IIT ISM JNF 2026 PDF:
 - Applications support one-time edit and withdraw actions.
 - Export endpoint: `/api/reports/applications/export` (Excel).
 - Seeder includes demo admin:
-  - email: `admin@campus.local`
+  - email: `24je0900@iitism.ac.in`
   - password: `Admin@12345`
 - Frontend route protection added via NextAuth middleware:
   - unauthenticated users are blocked from app routes

@@ -169,14 +169,14 @@ export default function ApplicationsPage() {
   return (
     <AppShell>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <Box component={motion.div} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
             {getTitle()}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {isAdmin ? "Administrative view: Approve or reject submissions from all companies." : "View and manage applications submitted by your company."}
           </Typography>
-        </motion.div>
+        </Box>
       </Box>
 
       {message && (
@@ -210,12 +210,13 @@ export default function ApplicationsPage() {
               </TableRow>
             ) : (
               rows.map((row, index) => (
-                <motion.tr
+                <TableRow
                   key={row.id}
+                  component={motion.tr}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  style={{ display: 'table-row' }}
+                  sx={{ display: 'table-row' }}
                 >
                   <TableCell sx={{ fontWeight: 500 }}>{row.profile_name || `Job #${row.job_id}`}</TableCell>
                   <TableCell>{row.company_name || session?.user?.name || "-"}</TableCell>
@@ -281,7 +282,7 @@ export default function ApplicationsPage() {
                       )}
                     </Stack>
                   </TableCell>
-                </motion.tr>
+                </TableRow>
               ))
             )}
           </TableBody>

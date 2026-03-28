@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
 use App\Models\JobProfile;
 use App\Models\JobStage;
+use App\Mail\ApplicationStatusUpdatedMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ApplicationController extends Controller
@@ -203,7 +205,16 @@ class ApplicationController extends Controller
             $data['edit_count'] = ((int) ($application->edit_count ?? 0)) + 1;
         }
 
+        $oldStatus = $application->status;
         $application->update($data);
+
+        if ($oldStatus !== $application->status && in_array($application->status, ['selected', 'rejected'])) {
+            try {
+                Mail::to($application->candidate_email)->send(new ApplicationStatusUpdatedMail($application, $application->status));
+            } catch (\Throwable $e) {
+                Log::warning('Application status mail failed: '.$e->getMessage());
+            }
+        }
 
         return response()->json($application);
     }
