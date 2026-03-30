@@ -23,21 +23,23 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
     window.localStorage.setItem("theme-mode", next);
   };
 
-  // Prevent hydration mismatch by always rendering light mode on server
-  const theme = React.useMemo(() => getTheme(mounted ? mode : "light"), [mounted, mode]);
+  // Prevent hydration mismatch by returning children directly on server
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
+  const theme = getTheme(mode);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {mounted && (
-        <IconButton
-          color="inherit"
-          onClick={toggle}
-          sx={{ position: "fixed", right: 24, bottom: 24, bgcolor: "background.paper", zIndex: 1300, boxShadow: 3 }}
-        >
-          {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
-        </IconButton>
-      )}
+      <IconButton
+        color="inherit"
+        onClick={toggle}
+        sx={{ position: "fixed", right: 24, bottom: 24, bgcolor: "background.paper", zIndex: 1300, boxShadow: 3 }}
+      >
+        {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
+      </IconButton>
       {children}
     </ThemeProvider>
   );

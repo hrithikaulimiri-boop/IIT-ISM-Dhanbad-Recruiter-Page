@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\JobController;
@@ -10,6 +11,10 @@ use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\RecruitmentCycleController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DashboardController;
+
+Route::get('/test', function () {
+    return response()->json(['message' => 'API is reachable']);
+});
 
 Route::prefix('auth')->group(function () {
     Route::post('/register-request', [AuthController::class, 'registerRequest']);
@@ -26,8 +31,21 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware(['auth:api'])->group(function () {
+    Route::get('/auth-check', function () {
+        Log::info('Auth check called. Token: ' . request()->bearerToken());
+        Log::info('Guard user: ' . (auth('api')->user() ? auth('api')->user()->id : 'none'));
+        return response()->json([
+            'authenticated' => auth('api')->check(),
+            'user' => auth('api')->user(),
+            'token' => request()->bearerToken(),
+            'headers' => request()->headers->all()
+        ]);
+    });
+    
     Route::apiResource('companies', CompanyController::class);
     Route::apiResource('jobs', JobController::class);
+    Route::post('/jobs/{id}/duplicate', [JobController::class, 'duplicate']);
+    Route::post('/jobs/{id}/sync', [JobController::class, 'sync']);
     Route::apiResource('stages', StageController::class);
     Route::get('/hiring-stages', [HiringStageController::class, 'index']);
     Route::apiResource('applications', ApplicationController::class);

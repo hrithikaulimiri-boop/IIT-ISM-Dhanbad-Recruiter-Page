@@ -7,7 +7,7 @@
     <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
         <h2 style="color: #00796b;">Application Status Update</h2>
         <p>Hello,</p>
-        <p>This is to inform you that the status of your application for the profile <strong>{{ $application->jobProfile->profile_name }}</strong> has been updated.</p>
+        <p>This is to inform you that the status of your application for the profile <strong>{{ $application->job?->profile_name }}</strong> has been updated.</p>
         <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px; text-align: center;">
             <span style="font-size: 18px; font-weight: bold; color: {{ $status === 'selected' ? '#2e7d32' : '#d32f2f' }};">
                 Status: {{ $status === 'selected' ? 'APPROVED' : 'REJECTED' }}

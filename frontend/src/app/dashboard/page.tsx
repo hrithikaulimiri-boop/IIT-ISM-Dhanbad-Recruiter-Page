@@ -81,8 +81,6 @@ export default function DashboardPage() {
         { title: "APPLICATION FOR JNF", icon: Briefcase, href: "/jobs?type=JNF", color: "#00796b", delay: 0.1 },
         { title: "APPLICATION FOR INF", icon: GraduationCap, href: "/jobs?type=INF", color: "#00897b", delay: 0.2 },
         { title: "MY APPLICATIONS", icon: ClipboardList, href: "/applications", color: "#009688", delay: 0.3 },
-        { title: "JNF SUBMISSIONS", icon: FileCheck, href: "/applications?portal=JNF", color: "#26a69a", delay: 0.4 },
-        { title: "INF SUBMISSIONS", icon: FileSearch, href: "/applications?portal=INF", color: "#4db6ac", delay: 0.5 },
       ];
 
   return (
@@ -114,13 +112,8 @@ export default function DashboardPage() {
           ))
         ) : (
           <>
-            {navItems.slice(0, 2).map((item) => (
-              <Grid key={item.title} size={{ xs: 12, md: 6 }}>
-                <NavCard {...item} />
-              </Grid>
-            ))}
-            {navItems.slice(2).map((item) => (
-              <Grid key={item.title} size={{ xs: 12, md: 4 }}>
+            {navItems.map((item, index) => (
+              <Grid key={item.title} size={{ xs: 12, md: index === 2 ? 12 : 6 }}>
                 <NavCard {...item} />
               </Grid>
             ))}

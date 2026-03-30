@@ -9,8 +9,14 @@ class Salary extends Model
     protected $table = 'salary';
     protected $primaryKey = 'salary_id';
     protected $fillable = [
-        'job_id', 'ctc_lpa', 'fixed_component', 'joining_bonus',
-        'retention_bonus', 'variable_component', 'esops', 'stocks_options',
-        'stipend', 'internship_duration', 'currency'
+        'job_id', 'currency', 'stipend', 'internship_duration', 
+        'different_structure_per_programme', 'salaries_json', 
+        'additional_components', 'ctc_lpa'
+    ];
+
+    protected $casts = [
+        'different_structure_per_programme' => 'boolean',
+        'salaries_json' => 'array',
+        'additional_components' => 'array',
     ];
 }

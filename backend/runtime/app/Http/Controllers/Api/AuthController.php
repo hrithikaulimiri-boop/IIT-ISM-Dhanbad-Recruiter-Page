@@ -10,10 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Throwable;
 
-use Illuminate\Support\Facades\Auth;
 use App\Mail\RegisterOtpMail;
 use App\Mail\RegistrationSuccessfulMail;
 use App\Mail\PasswordResetOtpMail;
@@ -27,12 +27,13 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
         ]);
 
+        $email = strtolower($data['email']);
         $otp = rand(100000, 999999);
-        Cache::put('otp_'.$data['email'], $otp, now()->addMinutes(10));
+        Cache::put('otp_'.$email, $otp, now()->addMinutes(10));
 
         try {
-            Mail::to($data['email'])->send(new RegisterOtpMail($otp));
-            Log::info("OTP for {$data['email']}: $otp");
+            Mail::to($email)->send(new RegisterOtpMail($otp));
+            Log::info("OTP for {$email}: $otp");
         } catch (Throwable $e) {
             Log::error("Failed to send OTP: " . $e->getMessage());
             return response()->json(['message' => 'Failed to send OTP. Please check your email configuration.'], 500);
@@ -49,14 +50,26 @@ class AuthController extends Controller
             'registration_data' => 'required|array',
         ]);
 
-        $storedOtp = Cache::get('otp_'.$data['email']);
+        $email = strtolower($data['email']);
+        $cacheKey = 'otp_'.$email;
+        $storedOtp = Cache::get($cacheKey);
+
+        Log::info("Verifying OTP for email: {$email}");
+        Log::info("Cache key: {$cacheKey}");
+        Log::info("Stored OTP: " . ($storedOtp ?? 'NULL'));
+        Log::info("Provided OTP: {$data['otp']}");
+
         if (!$storedOtp || $data['otp'] !== (string)$storedOtp) {
             return response()->json(['message' => 'Wrong OTP entered. Please try again.'], 422);
         }
 
-        Cache::forget('otp_'.$data['email']);
+        $response = $this->register($request->merge($data['registration_data']));
 
-        return $this->register($request->merge($data['registration_data']));
+        if ($response->getStatusCode() === 201) {
+            Cache::forget($cacheKey);
+        }
+
+        return $response;
     }
 
     public function resendOtp(Request $request)
@@ -133,7 +146,7 @@ class AuthController extends Controller
                 'social_media' => $data['company_social_media'] ?? null,
                 'established_year' => $data['company_established_year'],
                 'annual_turnover' => $data['company_turnover'],
-                'num_employees' => $data['num_employees'],
+                'employee_count' => $data['num_employees'],
                 'sectors' => $data['company_sectors'],
             ]
         );
@@ -151,10 +164,12 @@ class AuthController extends Controller
             $company->social_media = $data['company_social_media'] ?? null;
             $company->established_year = $data['company_established_year'];
             $company->annual_turnover = $data['company_turnover'];
-            $company->num_employees = $data['num_employees'];
+            $company->employee_count = $data['num_employees'];
             $company->sectors = $data['company_sectors'];
             $company->save();
         }
+
+        $data['email'] = strtolower($data['email']);
 
         $user = User::create([
             'name' => $data['name'],
@@ -247,10 +262,18 @@ class AuthController extends Controller
             return response()->json(['message' => 'Your account is pending approval by the placement admin.'], 403);
         }
 
+        Log::info("Login successful for user: {$user->email}");
+        Log::info("Generated token: " . substr($token, 0, 20) . "...");
+
         return response()->json([
             'data' => [
                 'token' => $token,
                 'user' => $user,
+                'debug' => [
+                    'guard' => 'api',
+                    'auth_check' => auth('api')->check(),
+                    'user_id' => auth('api')->id(),
+                ]
             ]
         ]);
     }

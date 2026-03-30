@@ -18,6 +18,7 @@ export const authOptions: NextAuthOptions = {
             password: credentials?.password,
           });
           const data = response.data?.data;
+          console.log("Login successful, debug data:", data.debug);
           if (!data?.token) return null;
           return {
             id: data.user.id,
@@ -35,7 +36,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user?: any }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.user = {
@@ -49,7 +50,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (token.user) {
         session.user = token.user;
         session.accessToken = token.accessToken;

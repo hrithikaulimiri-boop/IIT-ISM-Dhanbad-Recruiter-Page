@@ -47,12 +47,41 @@ export const getTheme = (mode: "light" | "dark") =>
     ...common,
     palette: {
       mode,
-      primary: { main: "#6366F1" },
-      secondary: { main: "#A78BFA" },
-      success: { main: "#34D399" },
+      primary: { main: "#00796b", dark: "#004d40", light: "#b2dfdb" },
+      secondary: { main: "#00897b" },
+      success: { main: "#009688" },
       background:
         mode === "light"
-          ? { default: "#F9FAFB", paper: "#FFFFFF" }
-          : { default: "#0F172A", paper: "#111827" },
+          ? { default: "#e0f2f1", paper: "rgba(255, 255, 255, 0.8)" }
+          : { default: "#002d2d", paper: "rgba(0, 45, 45, 0.8)" },
+    },
+    components: {
+      ...common.components,
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            borderRadius: 32,
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(255, 255, 255, 0.5)",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.05)",
+          },
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 16,
+            fontWeight: 700,
+            textTransform: "none",
+            padding: "10px 24px",
+          },
+          containedPrimary: {
+            background: "linear-gradient(135deg, #00796b 0%, #004d40 100%)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #00695c 0%, #003d33 100%)",
+            },
+          },
+        },
+      },
     },
   });

@@ -11,14 +11,27 @@ class DashboardController extends Controller
 {
     public function analytics()
     {
+        $user = auth('api')->user();
+        if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
+
+        $jobQuery = JobProfile::query();
+        $appQuery = JobApplication::query();
+
+        if ($user->role === 'recruiter') {
+            $jobQuery->where('company_id', $user->company_id);
+            $appQuery->whereHas('job', function ($q) use ($user) {
+                $q->where('company_id', $user->company_id);
+            });
+        }
+
         return response()->json([
-            'total_jobs' => JobProfile::count(),
-            'active_applications' => JobApplication::where('status', 'in progress')->count(),
-            'recruitment_cycles' => RecruitmentCycle::count(),
+            'total_jobs' => $jobQuery->count(),
+            'active_applications' => (clone $appQuery)->where('status', 'in progress')->count(),
+            'recruitment_cycles' => RecruitmentCycle::count(), // Cycles are global for now
             'status_breakdown' => [
-                'selected' => JobApplication::where('status', 'selected')->count(),
-                'rejected' => JobApplication::where('status', 'rejected')->count(),
-                'in_progress' => JobApplication::where('status', 'in progress')->count(),
+                'selected' => (clone $appQuery)->where('status', 'selected')->count(),
+                'rejected' => (clone $appQuery)->where('status', 'rejected')->count(),
+                'in_progress' => (clone $appQuery)->where('status', 'in progress')->count(),
             ],
         ]);
     }

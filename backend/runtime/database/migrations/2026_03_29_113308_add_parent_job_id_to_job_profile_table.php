@@ -11,13 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('company', function (Blueprint $table) {
-            $table->json('sectors')->nullable()->after('sector');
-        });
-
         Schema::table('job_profile', function (Blueprint $table) {
-            $table->string('num_employees')->nullable()->after('onboarding_procedure');
-            $table->json('job_categories')->nullable()->after('num_employees');
+            $table->foreignId('parent_job_id')->nullable()->after('job_id')->constrained('job_profile', 'job_id')->nullOnDelete();
         });
     }
 
@@ -26,12 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('company', function (Blueprint $table) {
-            $table->dropColumn('sectors');
-        });
-
         Schema::table('job_profile', function (Blueprint $table) {
-            $table->dropColumn(['num_employees', 'job_categories']);
+            $table->dropForeign(['parent_job_id']);
+            $table->dropColumn('parent_job_id');
         });
     }
 };

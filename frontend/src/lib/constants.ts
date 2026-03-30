@@ -42,41 +42,96 @@ export const jnfDisciplines = [
 ];
 
 export const courseOptions = [
-  "B.Tech",
-  "M.Tech",
-  "MBA",
-  "M.Sc",
-  "PhD",
-  "Dual Degree",
+  "B.Tech / Dual Degree (JEE Advanced)",
+  "Integrated M.Tech (JEE Advanced)",
+  "M.Tech GATE (2-year)",
+  "M.Sc JAM (2-yr)",
+  "M.Sc.Tech JAM (3-yr)",
+  "MBA (CAT)",
+  "PhD (GATE/NET)",
+  "M.A. Digital Humanities & Social Sciences",
 ];
 
 const engineeringDisciplines = [
+  "Chemical Engineering",
+  "Civil Engineering",
   "Computer Science & Engineering",
   "Electrical Engineering",
   "Electronics & Communication Engineering",
+  "Engineering Physics",
   "Mechanical Engineering",
-  "Civil Engineering",
-  "Chemical Engineering",
   "Mining Engineering",
   "Petroleum Engineering",
   "Mathematics & Computing",
   "Data Analytics",
+  "Mineral Engineering",
+  "Mining Machinery Engineering",
+  "Applied Geology",
+  "Applied Geophysics",
 ] as const;
 
 /** Disciplines allowed per course (aligned with backend config/course_disciplines.php). */
 export const courseToDisciplines: Record<string, string[]> = {
-  "B.Tech": [...engineeringDisciplines],
-  "M.Tech": [...engineeringDisciplines],
-  "Dual Degree": [...engineeringDisciplines],
-  MBA: ["MBA"],
-  "M.Sc": [
-    "M.Sc.",
+  "B.Tech / Dual Degree (JEE Advanced)": [
+    "Chemical Engineering",
+    "Civil Engineering",
+    "Computer Science & Engineering",
+    "Electrical Engineering",
+    "Electronics & Communication Engineering",
+    "Engineering Physics",
+    "Mechanical Engineering",
+    "Mining Engineering",
+    "Petroleum Engineering",
     "Mathematics & Computing",
     "Data Analytics",
-    "Computer Science & Engineering",
-    "Chemical Engineering",
+    "Mineral Engineering",
+    "Mining Machinery Engineering",
   ],
-  PhD: Array.from(new Set<string>(["PhD", ...engineeringDisciplines])),
+  "Integrated M.Tech (JEE Advanced)": [
+    "Mathematics & Computing",
+    "Applied Geology",
+    "Applied Geophysics",
+  ],
+  "M.Tech GATE (2-year)": [
+    "Earthquake Science (Applied Geophysics)",
+    "Chemical Engg.",
+    "Power System Engg - Dawr",
+    "CSE - CSE Electronics",
+    "Communication & Signal Processing",
+    "Mechanical Engineering (Mining Machinery Engineering)",
+    "Power Metallurgy",
+    "Optical Communication - RF & VLSI Design",
+    "Mineral Engg",
+    "Environmental Sc. - Fuel &",
+    "Industrial Engg & Mgmt, Data Analytics",
+    "Machine Design",
+    "Thermal Engg",
+    "Mining Engg - Geomatics, Tunneling",
+    "Petroleum Engg",
+    "Pharmaceutical Sc. & Engg",
+  ],
+  "M.Sc JAM (2-yr)": [
+    "Physics",
+    "Chemistry",
+    "Mathematics & Computing",
+  ],
+  "M.Sc.Tech JAM (3-yr)": [
+    "Applied Geology",
+    "Applied Geophysics",
+  ],
+  "MBA (CAT)": [
+    "Business Analytics",
+    "Finance/Mktg/HR/Ops",
+  ],
+  "PhD (GATE/NET)": [
+    "All Engineering Departments",
+    "All Science Departments",
+    "Management Studies",
+    "Humanities & Social Sciences",
+  ],
+  "M.A. Digital Humanities & Social Sciences": [
+    "Digital Humanities & Social Sciences",
+  ],
 };
 
 /** AIPC declaration items for INF (Internship Notification Form). */

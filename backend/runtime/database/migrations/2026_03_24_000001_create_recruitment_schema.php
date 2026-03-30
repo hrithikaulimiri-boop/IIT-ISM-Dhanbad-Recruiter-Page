@@ -45,13 +45,28 @@ return new class extends Migration {
             $table->foreignId('cycle_id')->constrained('recruitment_cycle', 'cycle_id');
             $table->enum('job_type', ['INF', 'JNF']);
             $table->string('profile_name');
+            $table->string('job_designation')->nullable();
+            $table->string('place_of_posting')->nullable();
             $table->text('description');
-            $table->string('location');
+            $table->string('location')->nullable();
+            $table->enum('work_mode', ['online', 'offline', 'hybrid'])->default('offline');
+            $table->string('offline_job_location')->nullable();
+            $table->string('expected_hires')->nullable();
+            $table->string('min_hires')->nullable();
+            $table->json('required_skills')->nullable();
             $table->string('training_period')->nullable();
             $table->string('bond')->nullable();
             $table->string('registration_link')->nullable();
             $table->string('joining_month')->nullable();
             $table->text('onboarding_procedure')->nullable();
+            $table->text('additional_info')->nullable();
+            $table->text('additional_info_1000')->nullable();
+            $table->json('job_categories')->nullable();
+            $table->boolean('has_psychometric_test')->default(false);
+            $table->boolean('has_medical_test')->default(false);
+            $table->text('other_screening_details')->nullable();
+            $table->unsignedInteger('last_completed_step')->default(0);
+            $table->enum('status', ['draft', 'pending', 'submitted'])->default('draft');
             $table->timestamps();
         });
 
@@ -64,9 +79,13 @@ return new class extends Migration {
         Schema::create('job_stage', function (Blueprint $table) {
             $table->id();
             $table->foreignId('job_id')->constrained('job_profile', 'job_id')->cascadeOnDelete();
-            $table->foreignId('stage_id')->constrained('hiring_stage', 'stage_id');
+            $table->string('stage_id')->nullable(); // Can be custom or reference hiring_stage
             $table->unsignedInteger('sequence');
             $table->string('duration')->nullable();
+            $table->string('selection_mode')->nullable();
+            $table->string('test_type')->nullable();
+            $table->string('interview_mode')->nullable();
+            $table->text('infrastructure_requirements')->nullable();
             $table->timestamp('start_time')->nullable();
             $table->timestamp('end_time')->nullable();
             $table->timestamps();
@@ -84,24 +103,25 @@ return new class extends Migration {
         });
 
         Schema::create('salary', function (Blueprint $table) {
-            $table->id('salary_id');
+            $table->id();
             $table->foreignId('job_id')->constrained('job_profile', 'job_id')->cascadeOnDelete();
-            $table->decimal('ctc_lpa', 10, 2);
-            $table->decimal('fixed_component', 10, 2)->nullable();
-            $table->decimal('joining_bonus', 10, 2)->nullable();
-            $table->decimal('retention_bonus', 10, 2)->nullable();
-            $table->decimal('variable_component', 10, 2)->nullable();
-            $table->decimal('esops', 10, 2)->nullable();
-            $table->decimal('stocks_options', 10, 2)->nullable();
+            $table->string('currency')->default('INR');
+            $table->decimal('stipend', 10, 2)->nullable();
+            $table->string('internship_duration')->nullable();
+            $table->boolean('different_structure_per_programme')->default(false);
+            $table->json('salaries_json')->nullable();
+            $table->json('additional_components')->nullable();
+            $table->decimal('ctc_lpa', 10, 2)->nullable(); // Retained for legacy
             $table->timestamps();
         });
 
         Schema::create('eligibility', function (Blueprint $table) {
             $table->id();
             $table->foreignId('job_id')->constrained('job_profile', 'job_id')->cascadeOnDelete();
-            $table->decimal('min_cgpa', 3, 2)->nullable();
-            $table->enum('gender', ['All', 'Male', 'Female', 'Others'])->default('All');
-            $table->text('slp_requirement')->nullable();
+            $table->string('global_min_cgpa')->nullable();
+            $table->string('global_max_backlogs')->nullable();
+            $table->string('high_school_percentage')->nullable();
+            $table->string('gender_filter')->default('All');
             $table->json('disciplines_json')->nullable();
             $table->timestamps();
         });
@@ -142,6 +162,12 @@ return new class extends Migration {
             $table->boolean('agreed')->default(false);
             $table->timestamp('agreed_at')->nullable();
             $table->unsignedBigInteger('agreed_by_user_id')->nullable();
+            $table->json('aipc_guidelines')->nullable();
+            $table->string('authorised_signatory_name')->nullable();
+            $table->string('authorised_signatory_designation')->nullable();
+            $table->string('authorised_signatory_date')->nullable();
+            $table->string('typed_signature')->nullable();
+            $table->boolean('rti_nirf_consent')->default(false);
             $table->longText('declaration_text')->nullable();
             $table->timestamps();
         });
