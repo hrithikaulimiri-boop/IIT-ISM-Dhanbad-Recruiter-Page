@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CompanyController extends Controller
 {
     public function index()
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role === 'recruiter') {
             return response()->json(Company::where('company_id', $user->company_id)->paginate());
         }
@@ -19,7 +20,7 @@ class CompanyController extends Controller
 
     public function show($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role === 'recruiter' && (int) $id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -28,7 +29,7 @@ class CompanyController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role !== 'admin') {
             return response()->json(['message' => 'Only admin can create company'], 403);
         }
@@ -42,7 +43,7 @@ class CompanyController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role === 'recruiter' && (int) $id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -54,7 +55,7 @@ class CompanyController extends Controller
 
     public function destroy($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role !== 'admin') {
             return response()->json(['message' => 'Only admin can delete company'], 403);
         }

@@ -177,7 +177,7 @@ class AuthController extends Controller
             'password' => Hash::make($data['password']),
             'role' => 'recruiter',
             'company_id' => $company->company_id,
-            'is_approved' => true,
+            'is_approved' => false,
         ]);
 
         $this->syncRegistrationContacts($company->company_id, $data['company_name'], $data);
@@ -251,14 +251,14 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!$token = auth('api')->attempt($credentials)) {
+        if (!$token = Auth::guard('api')->attempt($credentials)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
 
         if ($user->role === 'recruiter' && !$user->is_approved) {
-            auth('api')->logout();
+            Auth::guard('api')->logout();
             return response()->json(['message' => 'Your account is pending approval by the placement admin.'], 403);
         }
 
@@ -271,8 +271,8 @@ class AuthController extends Controller
                 'user' => $user,
                 'debug' => [
                     'guard' => 'api',
-                    'auth_check' => auth('api')->check(),
-                    'user_id' => auth('api')->id(),
+                    'auth_check' => Auth::guard('api')->check(),
+                    'user_id' => Auth::guard('api')->id(),
                 ]
             ]
         ]);
@@ -280,7 +280,7 @@ class AuthController extends Controller
 
     public function me()
     {
-        return response()->json(['data' => auth('api')->user()]);
+        return response()->json(['data' => Auth::guard('api')->user()]);
     }
 
     public function logout()

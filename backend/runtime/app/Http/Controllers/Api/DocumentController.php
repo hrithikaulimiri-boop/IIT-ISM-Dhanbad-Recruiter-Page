@@ -10,25 +10,26 @@ use App\Models\Salary;
 use App\Models\SalaryDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentController extends Controller
 {
     private function recruiterOwnsCompany(int $companyId): bool
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         return $user->role === 'admin' || (int) $user->company_id === $companyId;
     }
 
     private function recruiterOwnsJob(int $jobId): bool
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role === 'admin') return true;
         return JobProfile::where('job_id', $jobId)->where('company_id', $user->company_id)->exists();
     }
 
     private function recruiterOwnsSalary(int $salaryId): bool
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if ($user->role === 'admin') return true;
         $salary = Salary::find($salaryId);
         if (!$salary) return false;

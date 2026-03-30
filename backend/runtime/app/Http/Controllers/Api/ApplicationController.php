@@ -8,12 +8,15 @@ use App\Models\JobProfile;
 use App\Models\JobStage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
+use App\Mail\ApplicationStatusUpdatedMail;
 
 class ApplicationController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $portalType = $request->query('portal_type'); // 'JNF' or 'INF'
 
         if (!$user) {
@@ -140,7 +143,7 @@ class ApplicationController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         // Check if we are updating a JobProfile (Admin approval or Recruiter edit)
@@ -167,7 +170,7 @@ class ApplicationController extends Controller
         }
 
         // Updating a candidate application
-        $application = JobApplication::findOrFail($id);
+        $application = JobApplication::with(['job.company'])->findOrFail($id);
         if ($user->role === 'recruiter') {
             $owns = JobProfile::where('job_id', $application->job_id)->where('company_id', $user->company_id)->exists();
             if (!$owns) return response()->json(['message' => 'Forbidden'], 403);
@@ -177,12 +180,21 @@ class ApplicationController extends Controller
             'current_stage_id' => 'nullable|exists:job_stage,id',
             'status' => 'nullable|in:selected,rejected,in progress'
         ]));
+
+        if ($request->has('status') && in_array($request->status, ['selected', 'rejected'])) {
+            try {
+                Mail::to($application->candidate_email)->send(new ApplicationStatusUpdatedMail($application, $request->status));
+            } catch (\Exception $e) {
+                Log::error("Failed to send application status email for application ID: {$id}. Error: " . $e->getMessage());
+            }
+        }
+
         return response()->json($application);
     }
 
     public function withdraw($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $job = JobProfile::find($id);
@@ -212,7 +224,7 @@ class ApplicationController extends Controller
 
     public function show($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $app = JobApplication::find($id);
         if ($app) {
             return response()->json($app);
@@ -223,7 +235,7 @@ class ApplicationController extends Controller
 
     public function submit(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $application = JobApplication::findOrFail($id);
@@ -240,7 +252,7 @@ class ApplicationController extends Controller
 
     public function moveToNextStage(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         if ($user->role !== 'admin' && $user->role !== 'recruiter') {
@@ -274,7 +286,7 @@ class ApplicationController extends Controller
 
     public function destroy($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $application = JobApplication::find($id);

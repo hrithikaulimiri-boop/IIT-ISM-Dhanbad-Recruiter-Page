@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\JobProfile;
 use App\Models\JobStage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class StageController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $query = JobStage::query();
 
         if ($request->filled('job_id')) $query->where('job_id', $request->job_id);
@@ -26,7 +27,7 @@ class StageController extends Controller
 
     public function show($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $stage = JobStage::findOrFail($id);
         if ($user->role === 'recruiter') {
             $owns = JobProfile::where('job_id', $stage->job_id)->where('company_id', $user->company_id)->exists();
@@ -37,7 +38,7 @@ class StageController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $data = $request->validate([
             'job_id' => 'required|exists:job_profile,job_id',
             'stage_id' => 'required|exists:hiring_stage,stage_id',
@@ -57,7 +58,7 @@ class StageController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $stage = JobStage::findOrFail($id);
         if ($user->role === 'recruiter') {
             $owns = JobProfile::where('job_id', $stage->job_id)->where('company_id', $user->company_id)->exists();
@@ -69,7 +70,7 @@ class StageController extends Controller
 
     public function destroy($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $stage = JobStage::findOrFail($id);
         if ($user->role === 'recruiter') {
             $owns = JobProfile::where('job_id', $stage->job_id)->where('company_id', $user->company_id)->exists();

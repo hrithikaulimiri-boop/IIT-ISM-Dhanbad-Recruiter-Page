@@ -21,7 +21,7 @@ class JobController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -48,7 +48,7 @@ class JobController extends Controller
 
     public function show($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $job = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages', 'duplicates'])->findOrFail($id);
         if ($user->role === 'recruiter' && (int) $job->company_id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
@@ -58,7 +58,7 @@ class JobController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         
         // Inject company_id for recruiters before validation
         if ($user->role === 'recruiter') {
@@ -310,7 +310,7 @@ class JobController extends Controller
 
     public function update(Request $request, $id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $job = JobProfile::findOrFail($id);
         if ($user->role === 'recruiter' && (int) $job->company_id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
@@ -324,7 +324,7 @@ class JobController extends Controller
 
     public function destroy($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $job = JobProfile::findOrFail($id);
         if ($user->role === 'recruiter' && (int) $job->company_id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
@@ -335,7 +335,7 @@ class JobController extends Controller
 
     public function sync($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $parent = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages'])->findOrFail($id);
 
         if ($user->role === 'recruiter' && (int) $parent->company_id !== (int) $user->company_id) {
@@ -426,7 +426,7 @@ class JobController extends Controller
 
     public function duplicate($id)
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         $original = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages'])->findOrFail($id);
 
         if ($user->role === 'recruiter' && (int) $original->company_id !== (int) $user->company_id) {

@@ -44,6 +44,10 @@ class ApplicationStatusUpdatedMail extends Mailable
     {
         return new Content(
             view: 'emails.application-status',
+            with: [
+                'application' => $this->application,
+                'status' => $this->status,
+            ],
         );
     }
 

@@ -14,7 +14,7 @@ class Company extends Model
         'name', 'website', 'postal_address', 'employee_count', 'sector',
         'logo_path', 'allow_nirf_sharing', 'established_year', 'social_media',
         'street', 'city', 'state', 'country', 'pincode', 'phone', 'landline',
-        'annual_turnover', 'num_employees', 'sectors'
+        'annual_turnover', 'sectors'
     ];
 
     protected $casts = [

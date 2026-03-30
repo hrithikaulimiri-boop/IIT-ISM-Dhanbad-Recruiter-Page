@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\JobApplication;
 use App\Models\JobProfile;
 use App\Models\RecruitmentCycle;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
     public function analytics()
     {
-        $user = auth('api')->user();
+        $user = Auth::guard('api')->user();
         if (!$user) return response()->json(['message' => 'Unauthenticated'], 401);
 
         $jobQuery = JobProfile::query();
