@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\DocumentParserController;
+use App\Http\Controllers\Api\AlumniMentorshipController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Api\AuthController;
@@ -24,13 +26,19 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+
     Route::middleware('auth:api')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
 
+Route::post('/alumni-mentorship', [AlumniMentorshipController::class, 'store']);
+Route::get('/alumni-mentorship/resume/{email}', [AlumniMentorshipController::class, 'getByEmail']);
+
 Route::middleware(['auth:api'])->group(function () {
+    Route::get('/alumni-mentorship', [AlumniMentorshipController::class, 'index']);
+    Route::put('/alumni-mentorship/{id}/status', [AlumniMentorshipController::class, 'updateStatus']);
     Route::get('/auth-check', function () {
         Log::info('Auth check called. Token: ' . request()->bearerToken());
         Log::info('Guard user: ' . (auth('api')->user() ? auth('api')->user()->id : 'none'));
@@ -45,6 +53,7 @@ Route::middleware(['auth:api'])->group(function () {
     Route::apiResource('companies', CompanyController::class);
     Route::apiResource('jobs', JobController::class);
     Route::post('/jobs/{id}/duplicate', [JobController::class, 'duplicate']);
+    Route::get('/jobs/{id}/sync-targets', [JobController::class, 'syncTargets']);
     Route::post('/jobs/{id}/sync', [JobController::class, 'sync']);
     Route::apiResource('stages', StageController::class);
     Route::get('/hiring-stages', [HiringStageController::class, 'index']);
@@ -66,4 +75,5 @@ Route::middleware(['auth:api'])->group(function () {
 
     Route::get('/dashboard/analytics', [DashboardController::class, 'analytics']);
     Route::get('/reports/applications/export', [ApplicationController::class, 'export']);
+    Route::post('/documents/parse', [DocumentParserController::class, 'parse']);
 });

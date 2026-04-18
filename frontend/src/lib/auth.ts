@@ -1,8 +1,10 @@
-import { NextAuthOptions } from "next-auth";
+// @ts-nocheck
+import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { api } from "@/lib/api";
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   providers: [
     CredentialsProvider({
@@ -18,7 +20,6 @@ export const authOptions: NextAuthOptions = {
             password: credentials?.password,
           });
           const data = response.data?.data;
-          console.log("Login successful, debug data:", data.debug);
           if (!data?.token) return null;
           return {
             id: data.user.id,
@@ -29,7 +30,10 @@ export const authOptions: NextAuthOptions = {
             portalType: data.user.portal_type,
             accessToken: data.token,
           };
-        } catch {
+        } catch (error: any) {
+          if (error.response?.data?.message) {
+            throw new Error(error.response.data.message);
+          }
           return null;
         }
       },

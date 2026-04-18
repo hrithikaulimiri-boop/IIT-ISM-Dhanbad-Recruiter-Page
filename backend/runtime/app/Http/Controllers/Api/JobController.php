@@ -21,7 +21,7 @@ class JobController extends Controller
 {
     public function index(Request $request)
     {
-        $user = Auth::guard('api')->user();
+        $user = auth('api')->user();
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -42,23 +42,47 @@ class JobController extends Controller
         }
 
         $perPage = min(max((int) $request->get('per_page', 15), 1), 200);
+        $paginator = $query->paginate($perPage);
 
-        return response()->json($query->paginate($perPage));
+        $paginator->getCollection()->transform(function ($job) use ($user) {
+            $job->is_editable = $this->calculateIsEditable($job, $user);
+            return $job;
+        });
+
+        return response()->json($paginator);
     }
 
     public function show($id)
     {
-        $user = Auth::guard('api')->user();
-        $job = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages', 'duplicates'])->findOrFail($id);
+        $user = auth('api')->user();
+        $job = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages', 'duplicates', 'company.contacts'])->findOrFail($id);
         if ($user->role === 'recruiter' && (int) $job->company_id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
+        $job->is_editable = $this->calculateIsEditable($job, $user);
         return response()->json($job);
+    }
+
+    private function calculateIsEditable($job, $user)
+    {
+        if (in_array($job->status, ['selected', 'rejected', 'approved'])) {
+            return false;
+        }
+
+        if ($user->role === 'admin') {
+            return !$job->admin_edited && in_array($job->status, ['submitted', 'pending', 'in progress']);
+        }
+
+        if ($user->role === 'recruiter') {
+            return in_array($job->status, ['draft', 'pending']);
+        }
+
+        return false;
     }
 
     public function store(Request $request)
     {
-        $user = Auth::guard('api')->user();
+        $user = auth('api')->user();
         
         // Inject company_id for recruiters before validation
         if ($user->role === 'recruiter') {
@@ -67,6 +91,19 @@ class JobController extends Controller
 
         $isDraft = $request->get('status') === 'draft' || $request->get('status') === 'pending';
         
+        // Clean numeric fields for drafts
+        if ($isDraft) {
+            if ($request->has('salary.stipend') && $request->input('salary.stipend') === "") {
+                $request->merge(['salary' => array_merge($request->input('salary', []), ['stipend' => null])]);
+            }
+            if ($request->has('salary.ctc_lpa') && $request->input('salary.ctc_lpa') === "") {
+                $request->merge(['salary' => array_merge($request->input('salary', []), ['ctc_lpa' => null])]);
+            }
+            if ($request->has('eligibility.global_min_cgpa') && $request->input('eligibility.global_min_cgpa') === "") {
+                $request->merge(['eligibility' => array_merge($request->input('eligibility', []), ['global_min_cgpa' => null])]);
+            }
+        }
+
         $rules = [
             'job_id' => 'nullable|exists:job_profile,job_id',
             'company_id' => 'required|exists:company,company_id',
@@ -95,6 +132,7 @@ class JobController extends Controller
             
             // Salary
             'salary.currency' => $isDraft ? 'nullable|string|max:10' : 'required|string|max:10',
+            'salary.ctc_lpa' => 'nullable|numeric|min:0',
             'salary.different_structure_per_programme' => 'nullable|boolean',
             'salary.salaries_json' => 'nullable|array',
             'salary.additional_components' => 'nullable|array',
@@ -119,7 +157,7 @@ class JobController extends Controller
             
             // Stages
             'stages' => $isDraft ? 'nullable|array' : 'required|array|min:1',
-            'stages.*.stage_id' => 'required|exists:hiring_stage,stage_id',
+            'stages.*.stage_id' => 'required', // Relaxed to allow custom stage IDs if not in hiring_stage table
             'stages.*.sequence' => 'required|integer|min:1',
             'stages.*.duration' => 'nullable|string',
             'stages.*.selection_mode' => 'nullable|string',
@@ -185,6 +223,11 @@ class JobController extends Controller
                 // Extra ownership check for recruiters
                 if ($user->role === 'recruiter' && (int)$job->company_id !== (int)$user->company_id) {
                     throw new \Exception("Forbidden", 403);
+                }
+                
+                // If admin is editing a submitted/pending job, mark as admin_edited
+                if ($user->role === 'admin' && in_array($job->status, ['submitted', 'pending', 'in progress'])) {
+                    $jobData['admin_edited'] = true;
                 }
                 
                 $job->update($jobData);
@@ -255,7 +298,7 @@ class JobController extends Controller
             return $job;
         });
 
-        if ($data['status'] === 'submitted') {
+        if ($data['status'] === 'submitted' && $user->role === 'recruiter') {
             $payload->load('company');
             try {
                 Mail::raw("A new {$payload->job_type} application has been submitted by {$payload->company->name}.\n\nJob Profile: {$payload->profile_name}\nLocation: {$payload->location}\n\nPlease login to the admin portal to review and approve/reject the application.", function ($msg) use ($payload) {
@@ -333,94 +376,132 @@ class JobController extends Controller
         return response()->json(['message' => 'Deleted']);
     }
 
-    public function sync($id)
+    public function syncTargets($id)
     {
-        $user = Auth::guard('api')->user();
-        $parent = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages'])->findOrFail($id);
+        $user = auth('api')->user();
+        $current = JobProfile::findOrFail($id);
 
-        if ($user->role === 'recruiter' && (int) $parent->company_id !== (int) $user->company_id) {
+        if ($user->role === 'recruiter' && (int) $current->company_id !== (int) $user->company_id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $duplicates = JobProfile::where('parent_job_id', $id)->get();
+        // If current is child, parent is current->parent_job_id.
+        // If current is parent, parent is current->job_id.
+        $parentId = $current->parent_job_id ?: $current->job_id;
+        $parent = JobProfile::findOrFail($parentId);
 
-        return DB::transaction(function () use ($parent, $duplicates, $user) {
-            foreach ($duplicates as $duplicate) {
-                // Update basic fields but keep the duplicate's own status and profile name
-                $duplicate->update([
-                    'job_designation' => $parent->job_designation,
-                    'place_of_posting' => $parent->place_of_posting,
-                    'description' => $parent->description,
-                    'location' => $parent->location,
-                    'work_mode' => $parent->work_mode,
-                    'offline_job_location' => $parent->offline_job_location,
-                    'expected_hires' => $parent->expected_hires,
-                    'min_hires' => $parent->min_hires,
-                    'required_skills' => $parent->required_skills,
-                    'training_period' => $parent->training_period,
-                    'bond' => $parent->bond,
-                    'registration_link' => $parent->registration_link,
-                    'joining_month' => $parent->joining_month,
-                    'onboarding_procedure' => $parent->onboarding_procedure,
-                    'additional_info' => $parent->additional_info,
-                    'additional_info_1000' => $parent->additional_info_1000,
-                    'job_categories' => $parent->job_categories,
-                    'has_psychometric_test' => $parent->has_psychometric_test,
-                    'has_medical_test' => $parent->has_medical_test,
-                    'other_screening_details' => $parent->other_screening_details,
+        // Targets are the parent (if current is not parent) and all children (except current)
+        $targets = JobProfile::where('parent_job_id', $parentId)
+            ->orWhere('job_id', $parentId)
+            ->get()
+            ->filter(fn($j) => $j->job_id !== (int)$id)
+            ->map(fn($j) => [
+                'id' => $j->job_id,
+                'name' => $j->profile_name . ($j->job_id === $parentId ? ' (Original)' : '')
+            ])
+            ->values();
+
+        return response()->json(['targets' => $targets]);
+    }
+
+    public function sync(Request $request, $id)
+    {
+        $user = auth('api')->user();
+        $source = JobProfile::with(['salary', 'eligibility', 'declaration', 'stages'])->findOrFail($id);
+
+        if ($user->role === 'recruiter' && (int) $source->company_id !== (int) $user->company_id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $targetIds = $request->input('target_job_ids', []);
+        if (empty($targetIds)) {
+            // Default: sync to all duplicates if source is parent
+            if (!$source->parent_job_id) {
+                $targetIds = JobProfile::where('parent_job_id', $id)->pluck('job_id')->toArray();
+            } else {
+                return response()->json(['message' => 'No sync targets selected.'], 400);
+            }
+        }
+
+        $targets = JobProfile::whereIn('job_id', $targetIds)->get();
+
+        return DB::transaction(function () use ($source, $targets, $user) {
+            foreach ($targets as $target) {
+                // Update basic fields but keep the target's own status and profile name
+                $target->update([
+                    'job_designation' => $source->job_designation,
+                    'place_of_posting' => $source->place_of_posting,
+                    'description' => $source->description,
+                    'location' => $source->location,
+                    'work_mode' => $source->work_mode,
+                    'offline_job_location' => $source->offline_job_location,
+                    'expected_hires' => $source->expected_hires,
+                    'min_hires' => $source->min_hires,
+                    'required_skills' => $source->required_skills,
+                    'training_period' => $source->training_period,
+                    'bond' => $source->bond,
+                    'registration_link' => $source->registration_link,
+                    'joining_month' => $source->joining_month,
+                    'onboarding_procedure' => $source->onboarding_procedure,
+                    'additional_info' => $source->additional_info,
+                    'additional_info_1000' => $source->additional_info_1000,
+                    'job_categories' => $source->job_categories,
+                    'has_psychometric_test' => $source->has_psychometric_test,
+                    'has_medical_test' => $source->has_medical_test,
+                    'other_screening_details' => $source->other_screening_details,
                 ]);
 
                 // Sync Salary
-                if ($parent->salary) {
-                    Salary::updateOrCreate(['job_id' => $duplicate->job_id], [
-                        'currency' => $parent->salary->currency,
-                        'stipend' => $parent->salary->stipend,
-                        'internship_duration' => $parent->salary->internship_duration,
-                        'different_structure_per_programme' => $parent->salary->different_structure_per_programme,
-                        'salaries_json' => $parent->salary->salaries_json,
-                        'additional_components' => $parent->salary->additional_components,
-                        'ctc_lpa' => $parent->salary->ctc_lpa,
+                if ($source->salary) {
+                    Salary::updateOrCreate(['job_id' => $target->job_id], [
+                        'currency' => $source->salary->currency,
+                        'stipend' => $source->salary->stipend,
+                        'internship_duration' => $source->salary->internship_duration,
+                        'different_structure_per_programme' => $source->salary->different_structure_per_programme,
+                        'salaries_json' => $source->salary->salaries_json,
+                        'additional_components' => $source->salary->additional_components,
+                        'ctc_lpa' => $source->salary->ctc_lpa,
                     ]);
                 }
 
                 // Sync Eligibility
-                if ($parent->eligibility) {
-                    Eligibility::updateOrCreate(['job_id' => $duplicate->job_id], [
-                        'global_min_cgpa' => $parent->eligibility->global_min_cgpa,
-                        'global_max_backlogs' => $parent->eligibility->global_max_backlogs,
-                        'global_allow_backlogs' => $parent->eligibility->global_allow_backlogs,
-                        'high_school_percentage' => $parent->eligibility->high_school_percentage,
-                        'gender_filter' => $parent->eligibility->gender_filter,
-                        'disciplines_json' => $parent->eligibility->disciplines_json,
+                if ($source->eligibility) {
+                    Eligibility::updateOrCreate(['job_id' => $target->job_id], [
+                        'global_min_cgpa' => $source->eligibility->global_min_cgpa,
+                        'global_max_backlogs' => $source->eligibility->global_max_backlogs,
+                        'global_allow_backlogs' => $source->eligibility->global_allow_backlogs,
+                        'high_school_percentage' => $source->eligibility->high_school_percentage,
+                        'gender_filter' => $source->eligibility->gender_filter,
+                        'disciplines_json' => $source->eligibility->disciplines_json,
                     ]);
                 }
 
                 // Sync Declaration
-                if ($parent->declaration) {
-                    Declaration::updateOrCreate(['job_id' => $duplicate->job_id], [
-                        'agreed' => $parent->declaration->agreed,
-                        'agreed_at' => $parent->declaration->agreed_at,
+                if ($source->declaration) {
+                    Declaration::updateOrCreate(['job_id' => $target->job_id], [
+                        'agreed' => $source->declaration->agreed,
+                        'agreed_at' => $source->declaration->agreed_at,
                         'agreed_by_user_id' => $user->id,
-                        'authorised_signatory_name' => $parent->declaration->authorised_signatory_name,
-                        'authorised_signatory_designation' => $parent->declaration->authorised_signatory_designation,
-                        'authorised_signatory_date' => $parent->declaration->authorised_signatory_date,
-                        'typed_signature' => $parent->declaration->typed_signature,
-                        'rti_nirf_consent' => $parent->declaration->rti_nirf_consent,
-                        'declaration_text' => $parent->declaration->declaration_text,
-                        'aipc_guidelines' => $parent->declaration->aipc_guidelines,
+                        'authorised_signatory_name' => $source->declaration->authorised_signatory_name,
+                        'authorised_signatory_designation' => $source->declaration->authorised_signatory_designation,
+                        'authorised_signatory_date' => $source->declaration->authorised_signatory_date,
+                        'typed_signature' => $source->declaration->typed_signature,
+                        'rti_nirf_consent' => $source->declaration->rti_nirf_consent,
+                        'declaration_text' => $source->declaration->declaration_text,
+                        'aipc_guidelines' => $source->declaration->aipc_guidelines,
                     ]);
                 }
 
-                // Sync Stages (Delete existing stages of duplicate and replicate parent stages)
-                $duplicate->stages()->delete();
-                foreach ($parent->stages as $stage) {
+                // Sync Stages
+                $target->stages()->delete();
+                foreach ($source->stages as $stage) {
                     $newStage = $stage->replicate();
-                    $newStage->job_id = $duplicate->job_id;
+                    $newStage->job_id = $target->job_id;
                     $newStage->save();
                 }
             }
 
-            return response()->json(['message' => 'Changes synced to ' . $duplicates->count() . ' duplicates.']);
+            return response()->json(['message' => 'Changes synced successfully to ' . $targets->count() . ' profiles.']);
         });
     }
 

@@ -36,6 +36,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>{children}</Box>;
   }
 
+  const isAdmin = (session?.user as any)?.role === "admin";
+
   return (
     <Box sx={{ 
       minHeight: "100vh", 
@@ -64,23 +66,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Box 
                 component={motion.div} 
-                animate={{ rotate: 360 }} 
+                animate={{ rotateY: 360 }} 
                 transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
                 sx={{ display: 'flex', alignItems: 'center' }}
               >
-                <Sparkles size={24} color="#00796b" />
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/en/3/3a/Indian_Institute_of_Technology_%28Indian_School_of_Mines%29%2C_Dhanbad_Logo.png" 
+                  alt="IIT (ISM) Dhanbad Logo" 
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
+                  style={{ width: 40, height: 40, objectFit: 'contain' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://www.iitism.ac.in/assets/img/logo.png";
+                  }}
+                />
               </Box>
-              IIT-ISM RECRUITER PORTAL
+              {isAdmin ? "IIT-ISM ADMIN PORTAL" : "IIT-ISM RECRUITER PORTAL"}
             </Typography>
             <Avatar sx={{ mr: 1.5, bgcolor: '#00796b', fontWeight: 700, border: '2px solid rgba(255,255,255,0.5)' }}>
-              {(session?.user as any)?.companyName?.[0] || session?.user?.name?.[0] || "R"}
+              {isAdmin ? "A" : ((session?.user as any)?.companyName?.[0] || session?.user?.name?.[0] || "R")}
             </Avatar>
             <Box sx={{ mr: 3, display: { xs: 'none', md: 'block' } }}>
               <Typography variant="body2" sx={{ fontWeight: 800, color: (theme) => theme.palette.mode === 'light' ? '#004d40' : '#e0f2f1' }}>
-                {(session?.user as any)?.companyName || session?.user?.name}
+                {isAdmin ? "Placement Admin" : ((session?.user as any)?.companyName || session?.user?.name)}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, opacity: 0.8 }}>
-                RECRUITER
+                {isAdmin ? "ADMIN" : "RECRUITER"}
               </Typography>
             </Box>
             <Button 

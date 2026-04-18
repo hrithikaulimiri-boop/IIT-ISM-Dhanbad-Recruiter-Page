@@ -40,9 +40,10 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     let active = true;
-    if (!session) return;
+    if (!session?.user) return;
     (async () => {
-      const userCompanyId = session.user.companyId ? String(session.user.companyId) : "";
+      const user = session.user as any;
+      const userCompanyId = user.companyId ? String(user.companyId) : "";
       if (active && userCompanyId) {
         setEntityId(userCompanyId);
       }
@@ -59,9 +60,10 @@ export default function DocumentsPage() {
   }, [session]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session?.user) return;
+    const user = session.user as any;
     if (docType === "company") {
-      setEntityId(session.user.companyId ? String(session.user.companyId) : "");
+      setEntityId(user.companyId ? String(user.companyId) : "");
       return;
     }
     if (docType === "job") {

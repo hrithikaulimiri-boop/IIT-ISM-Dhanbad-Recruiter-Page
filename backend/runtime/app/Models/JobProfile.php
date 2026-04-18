@@ -20,7 +20,7 @@ class JobProfile extends Model
         'onboarding_procedure', 'additional_info', 'additional_info_1000', 
         'job_categories', 'status', 'last_completed_step',
         'has_psychometric_test', 'has_medical_test', 'other_screening_details',
-        'parent_job_id'
+        'parent_job_id', 'admin_edited', 'ppo_provision'
     ];
 
     protected $casts = [
@@ -28,6 +28,7 @@ class JobProfile extends Model
         'required_skills' => 'array',
         'has_psychometric_test' => 'boolean',
         'has_medical_test' => 'boolean',
+        'admin_edited' => 'boolean',
         'last_completed_step' => 'integer',
         'parent_job_id' => 'integer',
     ];

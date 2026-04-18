@@ -17,6 +17,7 @@ use Throwable;
 use App\Mail\RegisterOtpMail;
 use App\Mail\RegistrationSuccessfulMail;
 use App\Mail\PasswordResetOtpMail;
+use App\Mail\RecruiterRegistrationPendingMail;
 use Illuminate\Support\Facades\Cache;
 
 class AuthController extends Controller
@@ -67,6 +68,8 @@ class AuthController extends Controller
 
         if ($response->getStatusCode() === 201) {
             Cache::forget($cacheKey);
+        } else {
+            Log::error("Registration failed during OTP verification for {$email}: " . json_encode($response->getData()));
         }
 
         return $response;
@@ -79,136 +82,138 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        $request->merge([
-            'landline' => filled($request->input('landline')) ? $request->input('landline') : null,
-            'company_social_media' => filled($request->input('company_social_media')) ? $request->input('company_social_media') : null,
-        ]);
-
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'company_name' => 'required|string|max:255',
-            'street' => 'required|string|max:255',
-            'city' => 'required|string|max:100',
-            'state' => 'required|string|max:100',
-            'country' => 'required|string|max:100',
-            'pincode' => 'required|string|max:20',
-            'postal_address' => 'required|string|max:500',
-            'phone' => 'required|string|max:20',
-            'landline' => 'nullable|string|max:20',
-            'company_website' => 'required|url|max:255',
-            'company_social_media' => 'nullable|string|max:255',
-            'company_established_year' => 'required|integer|min:1800|max:2100',
-            'company_turnover' => 'required|string|max:255',
-            'num_employees' => 'required|integer|min:1',
-            'company_sectors' => 'required|array|min:1',
-            'contact_hr.name' => 'required|string|max:255',
-            'contact_hr.designation' => 'required|string|max:255',
-            'contact_hr.email' => 'required|email|max:255',
-            'contact_hr.phone' => 'required|string|max:20',
-            'contact_2.name' => 'required|string|max:255',
-            'contact_2.designation' => 'required|string|max:255',
-            'contact_2.email' => 'required|email|max:255',
-            'contact_2.phone' => 'required|string|max:20',
-            'contact_3.name' => 'nullable|string|max:255',
-            'contact_3.designation' => 'required_with:contact_3.name|nullable|string|max:255',
-            'contact_3.email' => 'required_with:contact_3.name|nullable|email|max:255',
-            'contact_3.phone' => 'required_with:contact_3.name|nullable|string|max:20',
-        ]);
-
-        if (!$this->designationLooksLikeTalentAcquisition($data['contact_hr']['designation'])) {
-            return response()->json([
-                'message' => 'The lead contact must be designated as Head of Talent Acquisition (or equivalent).',
-                'errors' => ['contact_hr.designation' => ['Must be a Talent Acquisition lead role.']],
-            ], 422);
-        }
-
-        $existingCompany = Company::where('name', $data['company_name'])->first();
-        if ($existingCompany && User::where('company_id', $existingCompany->company_id)->where('role', 'recruiter')->exists()) {
-            return response()->json([
-                'message' => 'A recruiter account is already registered for this company. Only one account is allowed per company.',
-            ], 422);
-        }
-
-        $company = Company::firstOrCreate(
-            ['name' => $data['company_name']],
-            [
-                'street' => $data['street'],
-                'city' => $data['city'],
-                'state' => $data['state'],
-                'country' => $data['country'],
-                'pincode' => $data['pincode'],
-                'postal_address' => $data['postal_address'],
-                'phone' => $data['phone'],
-                'landline' => $data['landline'] ?? null,
-                'website' => $data['company_website'],
-                'social_media' => $data['company_social_media'] ?? null,
-                'established_year' => $data['company_established_year'],
-                'annual_turnover' => $data['company_turnover'],
-                'employee_count' => $data['num_employees'],
-                'sectors' => $data['company_sectors'],
-            ]
-        );
-
-        if (!$company->wasRecentlyCreated) {
-            $company->street = $data['street'];
-            $company->city = $data['city'];
-            $company->state = $data['state'];
-            $company->country = $data['country'];
-            $company->pincode = $data['pincode'];
-            $company->postal_address = $data['postal_address'];
-            $company->phone = $data['phone'];
-            $company->landline = $data['landline'] ?? null;
-            $company->website = $data['company_website'];
-            $company->social_media = $data['company_social_media'] ?? null;
-            $company->established_year = $data['company_established_year'];
-            $company->annual_turnover = $data['company_turnover'];
-            $company->employee_count = $data['num_employees'];
-            $company->sectors = $data['company_sectors'];
-            $company->save();
-        }
-
-        $data['email'] = strtolower($data['email']);
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'recruiter',
-            'company_id' => $company->company_id,
-            'is_approved' => false,
-        ]);
-
-        $this->syncRegistrationContacts($company->company_id, $data['company_name'], $data);
-
+        Log::info("Registering user: " . $request->input('email'));
         try {
-            Mail::to($user->email)->send(new RegistrationSuccessfulMail($user, $company));
-        } catch (Throwable $e) {
-            Log::warning('Registration success mail failed: '.$e->getMessage());
-        }
+            $request->merge([
+                'landline' => filled($request->input('landline')) ? $request->input('landline') : null,
+                'company_social_media' => filled($request->input('company_social_media')) ? $request->input('company_social_media') : null,
+            ]);
 
-        try {
-            Mail::raw(
-                "A new recruiter account was created.\n\nName: {$user->name}\nEmail: {$user->email}\nCompany: {$company->name}\nStreet: {$company->street}\nCity: {$company->city}\nCountry: {$company->country}\nPincode: {$company->pincode}\nPostal Address: {$company->postal_address}\nPhone: {$company->phone}\nLandline: {$company->landline}\nWebsite: {$company->website}\nSocial: {$company->social_media}\nEstablished Year: {$company->established_year}",
-                function ($msg) {
-                    $msg->to(env('ADMIN_EMAIL', 'admin@example.com'))
-                        ->from('no-reply@campus.local', 'Campus Recruitment System')
-                        ->subject('New Recruiter Account Created');
-                }
+            $data = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|string|min:8',
+                'company_name' => 'required|string|max:255',
+                'street' => 'required|string|max:255',
+                'city' => 'required|string|max:100',
+                'state' => 'required|string|max:100',
+                'country' => 'required|string|max:100',
+                'pincode' => 'required|string|max:20',
+                'postal_address' => 'required|string|max:500',
+                'phone' => 'required|string|max:20',
+                'landline' => 'nullable|string|max:20',
+                'company_website' => 'required|url|max:255',
+                'company_social_media' => 'nullable|string|max:255',
+                'company_established_year' => 'required|integer|min:1800|max:2100',
+                'company_turnover' => 'required|string|max:255',
+                'num_employees' => 'required|integer|min:1',
+                'company_sectors' => 'required|array|min:1',
+                'contact_hr.name' => 'required|string|max:255',
+                'contact_hr.designation' => 'required|string|max:255',
+                'contact_hr.email' => 'required|email|max:255',
+                'contact_hr.phone' => 'required|string|max:20',
+                'contact_2.name' => 'required|string|max:255',
+                'contact_2.designation' => 'required|string|max:255',
+                'contact_2.email' => 'required|email|max:255',
+                'contact_2.phone' => 'required|string|max:20',
+                'contact_3.name' => 'nullable|string|max:255',
+                'contact_3.designation' => 'required_with:contact_3.name|nullable|string|max:255',
+                'contact_3.email' => 'required_with:contact_3.name|nullable|email|max:255',
+                'contact_3.phone' => 'required_with:contact_3.name|nullable|string|max:20',
+            ]);
+
+            if (!$this->designationLooksLikeTalentAcquisition($data['contact_hr']['designation'])) {
+                Log::warning("Designation check failed for: " . $data['contact_hr']['designation']);
+                return response()->json([
+                    'message' => 'The lead contact must be designated as Head of Talent Acquisition (or equivalent).',
+                    'errors' => ['contact_hr.designation' => ['Must be a Talent Acquisition lead role.']],
+                ], 422);
+            }
+
+            $existingCompany = Company::where('name', $data['company_name'])->first();
+            if ($existingCompany && User::where('company_id', $existingCompany->company_id)->where('role', 'recruiter')->exists()) {
+                Log::warning("Company already registered: " . $data['company_name']);
+                return response()->json([
+                    'message' => 'A recruiter account is already registered for this company. Only one account is allowed per company.',
+                ], 422);
+            }
+
+            $company = Company::firstOrCreate(
+                ['name' => $data['company_name']],
+                [
+                    'street' => $data['street'],
+                    'city' => $data['city'],
+                    'state' => $data['state'],
+                    'country' => $data['country'],
+                    'pincode' => $data['pincode'],
+                    'postal_address' => $data['postal_address'],
+                    'phone' => $data['phone'],
+                    'landline' => $data['landline'] ?? null,
+                    'website' => $data['company_website'],
+                    'social_media' => $data['company_social_media'] ?? null,
+                    'established_year' => $data['company_established_year'],
+                    'annual_turnover' => $data['company_turnover'],
+                    'employee_count' => $data['num_employees'],
+                    'sectors' => $data['company_sectors'],
+                ]
             );
-        } catch (Throwable $e) {
-            Log::warning('Registration admin mail failed: '.$e->getMessage());
-        }
 
-        return response()->json(['message' => 'Registration completed successfully.'], 201);
+            if (!$company->wasRecentlyCreated) {
+                $company->update([
+                    'street' => $data['street'],
+                    'city' => $data['city'],
+                    'state' => $data['state'],
+                    'country' => $data['country'],
+                    'pincode' => $data['pincode'],
+                    'postal_address' => $data['postal_address'],
+                    'phone' => $data['phone'],
+                    'landline' => $data['landline'] ?? null,
+                    'website' => $data['company_website'],
+                    'social_media' => $data['company_social_media'] ?? null,
+                    'established_year' => $data['company_established_year'],
+                    'annual_turnover' => $data['company_turnover'],
+                    'employee_count' => $data['num_employees'],
+                    'sectors' => $data['company_sectors'],
+                ]);
+            }
+
+            $data['email'] = strtolower($data['email']);
+
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => 'recruiter',
+                'company_id' => $company->company_id,
+                'is_approved' => false,
+            ]);
+
+            $this->syncRegistrationContacts($company->company_id, $data['company_name'], $data);
+
+            Log::info("User created successfully: " . $user->email);
+
+            try {
+                Mail::to($user->email)->send(new RegistrationSuccessfulMail($user, $company));
+                
+                // Notify Admin
+                $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+                Mail::to($adminEmail)->send(new RecruiterRegistrationPendingMail($user));
+            } catch (Throwable $e) {
+                Log::warning('Registration notification mails failed: '.$e->getMessage());
+            }
+
+            return response()->json(['message' => 'Registration completed successfully.'], 201);
+        } catch (Throwable $e) {
+            Log::error("Registration error: " . $e->getMessage());
+            return response()->json(['message' => 'Registration failed: ' . $e->getMessage()], 500);
+        }
     }
 
     private function designationLooksLikeTalentAcquisition(string $designation): bool
     {
         $d = mb_strtolower($designation);
-        $hasTa = str_contains($d, 'talent') || str_contains($d, 'acquisition') || str_contains($d, 'hr') || str_contains($d, 'human resource');
-        $hasHeadRole = (bool) preg_match('/\b(head|chief|director|vp|vice president|manager|lead)\b/', $d);
+        $hasTa = str_contains($d, 'talent') || str_contains($d, 'acquisition') || str_contains($d, 'hr') || str_contains($d, 'human resource') || str_contains($d, 'recruitment');
+        $hasHeadRole = (bool) preg_match('/\b(head|chief|director|vp|vice president|manager|lead|recruiter|specialist|officer|executive)\b/', $d);
 
         return $hasTa && $hasHeadRole;
     }
@@ -251,7 +256,11 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
+        $credentials['email'] = strtolower($credentials['email']);
+        Log::info("Login attempt for: " . $credentials['email']);
+
         if (!$token = Auth::guard('api')->attempt($credentials)) {
+            Log::warning("Login failed for: " . $credentials['email']);
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 

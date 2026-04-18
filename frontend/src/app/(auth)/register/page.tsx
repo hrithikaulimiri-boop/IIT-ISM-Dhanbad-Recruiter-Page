@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, Button, Grid2 as Grid, MenuItem, Paper, Stack, TextField, Typography, Container, InputAdornment, OutlinedInput, Select, FormControl, InputLabel, Chip } from "@mui/material";
+import { Box, Button, Grid2 as Grid, MenuItem, Paper, Stack, TextField, Typography, Container, InputAdornment, OutlinedInput, Select, FormControl, InputLabel, Chip, Checkbox, CircularProgress } from "@mui/material";
 import { AxiosError } from "axios";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -69,6 +69,8 @@ export default function RegisterPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [isRobotVerified, setIsRobotVerified] = useState(false);
+  const [isVerifyingRobot, setIsVerifyingRobot] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -166,6 +168,7 @@ export default function RegisterPage() {
     if (!contactOk(form.contact_hr)) return "Contact person 1 details are incomplete or email is invalid";
     if (!contactOk(form.contact_2)) return "Contact person 2 details are incomplete or email is invalid";
     if (!contact3Ok) return "Contact person 3 details are incomplete or email is invalid";
+    if (!isRobotVerified) return "Please verify that you are not a robot";
     return null;
   };
 
@@ -189,6 +192,7 @@ export default function RegisterPage() {
           ? normalizeWebsiteUrl(socialRaw)
           : socialRaw,
         company_established_year: Number(form.company_established_year),
+        num_employees: Number(form.num_employees),
       };
       await api.post("/auth/register-request", payload);
       setVerificationMode(true);
@@ -213,11 +217,32 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     setError("");
     try {
-      await api.post("/auth/verify-otp", { email: form.email, otp: code, registration_data: form });
+      const socialRaw = form.company_social_media.trim();
+      const normalizedData = {
+        ...form,
+        company_website: normalizeWebsiteUrl(form.company_website),
+        company_social_media: socialRaw.includes("http") || socialRaw.includes(".")
+          ? normalizeWebsiteUrl(socialRaw)
+          : socialRaw,
+        company_established_year: Number(form.company_established_year),
+        num_employees: Number(form.num_employees),
+      };
+
+      await api.post("/auth/verify-otp", { 
+        email: form.email, 
+        otp: code, 
+        registration_data: normalizedData 
+      });
       setMessage("Account registered successfully! Redirecting to login...");
       setTimeout(() => router.push("/login"), 2000);
     } catch (err) {
-      setError("Wrong OTP entered. Please try again.");
+      const axiosErr = err as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
+      if (axiosErr.response?.data?.errors) {
+        const firstError = Object.values(axiosErr.response.data.errors)[0][0];
+        setError(firstError);
+      } else {
+        setError(axiosErr.response?.data?.message || "Verification failed. Please try again.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -257,15 +282,8 @@ export default function RegisterPage() {
   };
 
   if (!mounted) {
-    return (
-      <Box sx={{ 
-        minHeight: "100vh", 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)"
-      }} />
-    );
+    // Return null during hydration to avoid mismatch.
+    return null;
   }
 
   return (
@@ -696,30 +714,81 @@ export default function RegisterPage() {
                     </Stack>
                   </Box>
 
-                  {error && (
-                    <Typography color="error" align="center" sx={{ fontWeight: 600 }}>
-                      {error}
-                    </Typography>
-                  )}
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        p: 2, 
+                        bgcolor: 'rgba(0,0,0,0.02)', 
+                        borderRadius: 3, 
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        maxWidth: 300,
+                        mx: 'auto'
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+                        {isVerifyingRobot ? (
+                          <CircularProgress size={24} sx={{ m: 1, color: '#00796b' }} />
+                        ) : (
+                          <Checkbox 
+                            checked={isRobotVerified}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setIsVerifyingRobot(true);
+                                setTimeout(() => {
+                                  setIsVerifyingRobot(false);
+                                  setIsRobotVerified(true);
+                                }, 1500);
+                              } else {
+                                setIsRobotVerified(false);
+                              }
+                            }}
+                            sx={{ 
+                              color: '#00796b',
+                              '&.Mui-checked': { color: '#00796b' }
+                            }}
+                          />
+                        )}
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#004d40' }}>
+                          I'm not a robot
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', ml: 2 }}>
+                        <img 
+                          src="https://www.gstatic.com/recaptcha/api2/logo_48.png" 
+                          alt="reCAPTCHA" 
+                          style={{ width: 30, height: 30, opacity: 0.8 }} 
+                        />
+                        <Typography variant="caption" sx={{ display: 'block', fontSize: '0.6rem', color: 'text.secondary' }}>
+                          reCAPTCHA
+                        </Typography>
+                      </Box>
+                    </Box>
 
-                  <Button 
-                    variant="contained" 
-                    size="large"
-                    onClick={submit} 
-                    disabled={isSubmitting}
-                    sx={{ 
-                      py: 2,
-                      borderRadius: 4,
-                      textTransform: 'none',
-                      fontSize: '1.2rem',
-                      bgcolor: '#00796b',
-                      fontWeight: 700,
-                      boxShadow: '0 10px 20px rgba(0,121,107,0.2)',
-                      '&:hover': { bgcolor: '#00695c', boxShadow: '0 12px 24px rgba(0,121,107,0.3)' }
-                    }}
-                  >
-                    {isSubmitting ? "Processing..." : "Complete Email Verification"}
-                  </Button>
+                    {error && (
+                      <Typography color="error" align="center" sx={{ fontWeight: 600 }}>
+                        {error}
+                      </Typography>
+                    )}
+
+                    <Button 
+                      variant="contained" 
+                      size="large"
+                      onClick={submit} 
+                      disabled={isSubmitting || isVerifyingRobot}
+                      sx={{ 
+                        py: 2,
+                        borderRadius: 4,
+                        textTransform: 'none',
+                        fontSize: '1.2rem',
+                        bgcolor: '#00796b',
+                        fontWeight: 700,
+                        boxShadow: '0 10px 20px rgba(0,121,107,0.2)',
+                        '&:hover': { bgcolor: '#00695c', boxShadow: '0 12px 24px rgba(0,121,107,0.3)' }
+                      }}
+                    >
+                      {isSubmitting ? "Processing..." : "Complete Email Verification"}
+                    </Button>
                 </Stack>
               </>
             )}

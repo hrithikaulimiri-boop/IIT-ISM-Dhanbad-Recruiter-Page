@@ -4,10 +4,10 @@ import AppShell from "@/components/layout/AppShell";
 import { Grid2 as Grid, Typography, Box, Paper, Stack } from "@mui/material";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Briefcase, GraduationCap, ClipboardList, FileCheck, FileSearch } from "lucide-react";
+import { Briefcase, GraduationCap, ClipboardList, FileCheck, FileSearch, Users } from "lucide-react";
 import Link from "next/link";
 
-const NavCard = ({ title, icon: Icon, href, color, delay }: { title: string, icon: any, href: string, color: string, delay: number }) => (
+const NavCard = ({ title, icon: Icon, href, color, delay, subtitle }: { title: string, icon: any, href: string, color: string, delay: number, subtitle?: string }) => (
   <Box
     component={motion.div}
     initial={{ opacity: 0, y: 20 }}
@@ -60,7 +60,7 @@ const NavCard = ({ title, icon: Icon, href, color, delay }: { title: string, ico
         {title}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, opacity: 0.8 }}>
-        Manage your {title.toLowerCase()} processes
+        {subtitle || `Manage your ${title.toLowerCase()} processes`}
       </Typography>
     </Paper>
   </Box>
@@ -76,6 +76,7 @@ export default function DashboardPage() {
         { title: "PENDING APPROVAL", icon: FileSearch, href: "/applications?status=in progress", color: "#00897b", delay: 0.2 },
         { title: "JNF SUBMISSIONS", icon: FileCheck, href: "/applications?portal=JNF", color: "#009688", delay: 0.3 },
         { title: "INF SUBMISSIONS", icon: GraduationCap, href: "/applications?portal=INF", color: "#26a69a", delay: 0.4 },
+        { title: "ALUMNI MENTORS", icon: Users, href: "/admin/alumni-mentorship", color: "#fb8c00", delay: 0.5, subtitle: "View and manage alumni mentorship applications" },
       ]
     : [
         { title: "APPLICATION FOR JNF", icon: Briefcase, href: "/jobs?type=JNF", color: "#00796b", delay: 0.1 },
@@ -105,8 +106,8 @@ export default function DashboardPage() {
 
       <Grid container spacing={4}>
         {isAdmin ? (
-          navItems.map((item) => (
-            <Grid key={item.title} size={{ xs: 12, md: 6 }}>
+          navItems.map((item, index) => (
+            <Grid key={item.title} size={{ xs: 12, md: index === 4 ? 12 : 6 }}>
               <NavCard {...item} />
             </Grid>
           ))
