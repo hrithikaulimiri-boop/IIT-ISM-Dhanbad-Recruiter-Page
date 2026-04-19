@@ -18,7 +18,7 @@ class ApplicationController extends Controller
     public function index(Request $request)
     {
         $user = auth('api')->user();
-        $portalType = $request->query('portal_type'); // 'JNF' or 'INF'
+        $portalType = $request->query('portal') ?: $request->query('portal_type'); // 'JNF' or 'INF'
 
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated'], 401);
@@ -43,6 +43,7 @@ class ApplicationController extends Controller
                 return [
                     'id' => (int)$job->job_id,
                     'job_id' => (int)$job->job_id,
+                    'job_type' => $job->job_type,
                     'profile_name' => $job->profile_name,
                     'company_name' => $job->company?->name,
                     'status' => $job->status, // Use raw status: draft, pending, submitted, approved, rejected
@@ -83,6 +84,7 @@ class ApplicationController extends Controller
                 return [
                     'id' => (int)$job->job_id,
                     'job_id' => (int)$job->job_id,
+                    'job_type' => $job->job_type,
                     'profile_name' => $job->profile_name,
                     'company_name' => $job->company?->name,
                     'status' => $job->status, // Use raw status: draft, pending, submitted, approved, rejected
@@ -129,6 +131,7 @@ class ApplicationController extends Controller
             return [
                 'id' => $app->id,
                 'job_id' => $app->job_id,
+                'job_type' => $app->job?->job_type,
                 'profile_name' => $app->job?->profile_name,
                 'company_name' => $app->job?->company?->name,
                 'status' => $app->status,

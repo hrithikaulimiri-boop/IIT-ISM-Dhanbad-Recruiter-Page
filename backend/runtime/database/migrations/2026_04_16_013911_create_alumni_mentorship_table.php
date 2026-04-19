@@ -14,14 +14,14 @@ return new class extends Migration
         Schema::create('alumni_mentorship', function (Blueprint $table) {
             $table->id();
             $table->string('email');
-            $table->string('name');
-            $table->string('phone_number');
-            $table->string('year_of_completion');
-            $table->string('degree');
-            $table->string('discipline');
-            $table->string('current_job');
-            $table->text('areas_of_interest');
-            $table->string('linkedin_profile');
+            $table->string('name')->nullable();
+            $table->string('phone_number')->nullable();
+            $table->string('year_of_completion')->nullable();
+            $table->string('degree')->nullable();
+            $table->string('discipline')->nullable();
+            $table->string('current_job')->nullable();
+            $table->text('areas_of_interest')->nullable();
+            $table->string('linkedin_profile')->nullable();
             $table->text('general_comments')->nullable();
             $table->timestamps();
         });

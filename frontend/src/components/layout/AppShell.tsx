@@ -3,16 +3,21 @@
 import React from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { AppBar, Avatar, Box, Toolbar, Typography, Button, useMediaQuery, useTheme } from "@mui/material";
+import { AppBar, Avatar, Box, Toolbar, Typography, Button, useMediaQuery, useTheme, IconButton, Stack } from "@mui/material";
 import { motion } from "framer-motion";
 import HelpFab from "@/components/common/HelpFab";
-import { usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Sparkles, ArrowLeft } from "lucide-react";
+
+import { IIT_ISM_LOGO } from "@/lib/logo";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   React.useEffect(() => {
     setMounted(true);
@@ -21,6 +26,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     await signOut({ redirect: false });
     window.location.href = "/login";
+  };
+
+  const handleBack = () => {
+    if (pathname === '/dashboard') return;
+    router.back();
   };
 
   // Prevent hydration mismatch by returning a stable structure until mounted
@@ -42,6 +52,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <Box sx={{ 
       minHeight: "100vh", 
       bgcolor: "background.default",
+      display: 'flex',
+      flexDirection: 'column',
       background: (theme) => theme.palette.mode === 'light' 
         ? "linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%)" 
         : "linear-gradient(135deg, #002d2d 0%, #001a1a 100%)"
@@ -49,6 +61,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Box sx={{ flexGrow: 1 }}>
         <AppBar position="sticky" color="transparent" elevation={0} sx={{ borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
           <Toolbar sx={{ backdropFilter: "blur(20px)", bgcolor: (theme) => theme.palette.mode === 'light' ? "rgba(255,255,255,0.7)" : "rgba(0,45,45,0.7)" }}>
+            {pathname !== '/dashboard' && (
+              <IconButton 
+                onClick={handleBack}
+                sx={{ mr: 2, color: '#00796b', bgcolor: 'rgba(0,121,107,0.05)', '&:hover': { bgcolor: 'rgba(0,121,107,0.1)' } }}
+              >
+                <ArrowLeft size={20} />
+              </IconButton>
+            )}
             <Typography 
               variant="h6" 
               component={Link} 
@@ -68,20 +88,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 component={motion.div} 
                 animate={{ rotateY: 360 }} 
                 transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                sx={{ display: 'flex', alignItems: 'center' }}
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  bgcolor: '#fff',
+                  p: 0.2,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
               >
                 <img 
-                  src="https://upload.wikimedia.org/wikipedia/en/3/3a/Indian_Institute_of_Technology_%28Indian_School_of_Mines%29%2C_Dhanbad_Logo.png" 
+                  src={IIT_ISM_LOGO} 
                   alt="IIT (ISM) Dhanbad Logo" 
-                  crossOrigin="anonymous"
-                  referrerPolicy="no-referrer"
-                  style={{ width: 40, height: 40, objectFit: 'contain' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://www.iitism.ac.in/assets/img/logo.png";
-                  }}
+                  style={{ width: 45, height: 45, objectFit: 'contain', borderRadius: '50%' }}
                 />
               </Box>
-              {isAdmin ? "IIT-ISM ADMIN PORTAL" : "IIT-ISM RECRUITER PORTAL"}
+              {isAdmin ? "IIT (ISM) ADMIN PORTAL" : "IIT (ISM) RECRUITER PORTAL"}
             </Typography>
             <Avatar sx={{ mr: 1.5, bgcolor: '#00796b', fontWeight: 700, border: '2px solid rgba(255,255,255,0.5)' }}>
               {isAdmin ? "A" : ((session?.user as any)?.companyName?.[0] || session?.user?.name?.[0] || "R")}
@@ -111,6 +134,40 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </AppBar>
         <Box sx={{ p: { xs: 2, md: 5 }, maxWidth: '1440px', mx: 'auto' }}>{children}</Box>
       </Box>
+      
+      {/* Global Footer */}
+      <Box sx={{ 
+        mt: 'auto', 
+        py: 4, 
+        px: 3, 
+        textAlign: 'center', 
+        bgcolor: 'rgba(0,0,0,0.02)', 
+        borderTop: '1px solid rgba(0,0,0,0.05)',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: '#004d40', mb: 2, letterSpacing: 0.5 }}>
+          © 2026 INDIAN INSTITUTE OF TECHNOLOGY (ISM) DHANBAD • PLACEMENT CELL
+        </Typography>
+        <Stack direction="row" spacing={3} justifyContent="center">
+          <Typography 
+            component="a" 
+            href="https://www.iitism.ac.in/" 
+            target="_blank"
+            sx={{ color: '#00796b', textDecoration: 'none', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
+          >
+            About IIT (ISM) Dhanbad
+          </Typography>
+          <Typography 
+            component="a" 
+            href="https://www.iitism.ac.in/career-development-centre" 
+            target="_blank"
+            sx={{ color: '#00796b', textDecoration: 'none', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
+          >
+            Meet Our CDC
+          </Typography>
+        </Stack>
+      </Box>
+
       {pathname !== '/help' && <HelpFab />}
     </Box>
   );

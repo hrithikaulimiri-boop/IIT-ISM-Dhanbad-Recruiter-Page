@@ -4,7 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import { Grid2 as Grid, Typography, Box, Paper, Stack } from "@mui/material";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Briefcase, GraduationCap, ClipboardList, FileCheck, FileSearch, Users } from "lucide-react";
+import { Briefcase, GraduationCap, ClipboardList, FileCheck, FileSearch, Users, XCircle } from "lucide-react";
 import Link from "next/link";
 
 const NavCard = ({ title, icon: Icon, href, color, delay, subtitle }: { title: string, icon: any, href: string, color: string, delay: number, subtitle?: string }) => (
@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const navItems = isAdmin 
     ? [
         { title: "ALL SUBMISSIONS", icon: ClipboardList, href: "/applications", color: "#00796b", delay: 0.1 },
-        { title: "PENDING APPROVAL", icon: FileSearch, href: "/applications?status=in progress", color: "#00897b", delay: 0.2 },
+        { title: "PENDING APPROVAL", icon: FileSearch, href: "/applications?status=submitted", color: "#00897b", delay: 0.2 },
         { title: "JNF SUBMISSIONS", icon: FileCheck, href: "/applications?portal=JNF", color: "#009688", delay: 0.3 },
         { title: "INF SUBMISSIONS", icon: GraduationCap, href: "/applications?portal=INF", color: "#26a69a", delay: 0.4 },
         { title: "ALUMNI MENTORS", icon: Users, href: "/admin/alumni-mentorship", color: "#fb8c00", delay: 0.5, subtitle: "View and manage alumni mentorship applications" },
@@ -81,7 +81,9 @@ export default function DashboardPage() {
     : [
         { title: "APPLICATION FOR JNF", icon: Briefcase, href: "/jobs?type=JNF", color: "#00796b", delay: 0.1 },
         { title: "APPLICATION FOR INF", icon: GraduationCap, href: "/jobs?type=INF", color: "#00897b", delay: 0.2 },
-        { title: "MY APPLICATIONS", icon: ClipboardList, href: "/applications", color: "#009688", delay: 0.3 },
+        { title: "ALL APPLICATIONS", icon: ClipboardList, href: "/applications", color: "#009688", delay: 0.3 },
+        { title: "APPROVED APPLICATIONS", icon: FileCheck, href: "/applications?status=approved", color: "#2e7d32", delay: 0.4 },
+        { title: "REJECTED APPLICATIONS", icon: XCircle, href: "/applications?status=rejected", color: "#c62828", delay: 0.5 },
       ];
 
   return (

@@ -177,7 +177,7 @@ export default function AdminAlumniMentorshipPage() {
         PaperProps={{ sx: { borderRadius: 4, p: 2 } }}
       >
         <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#004d40' }}>Mentor Profile</Typography>
+          <Typography variant="h5" component="span" sx={{ fontWeight: 800, color: '#004d40' }}>Mentor Profile</Typography>
           <IconButton onClick={() => setSelectedApp(null)}><X /></IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 3 }}>

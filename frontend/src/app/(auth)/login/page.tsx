@@ -29,7 +29,7 @@ const FloatingIcon = ({ children, delay = 0, initialX = 0, initialY = 0, size = 
   </Box>
 );
 
-const InfoBox = ({ title, content, icon: Icon, delay }: { title: string, content: string, icon: any, delay: number }) => (
+const InfoBox = ({ title, content, icon: Icon, delay, href }: { title: string, content: string, icon: any, delay: number, href?: string }) => (
   <Box
     component={motion.div}
     initial={{ opacity: 0, y: 20 }}
@@ -40,6 +40,10 @@ const InfoBox = ({ title, content, icon: Icon, delay }: { title: string, content
   >
     <Paper
       elevation={0}
+      component={href ? "a" : Paper}
+      href={href}
+      target={href?.startsWith('http') ? "_blank" : undefined}
+      rel={href?.startsWith('http') ? "noopener noreferrer" : undefined}
       sx={{
         p: 4,
         height: '100%',
@@ -48,6 +52,9 @@ const InfoBox = ({ title, content, icon: Icon, delay }: { title: string, content
         backdropFilter: 'blur(15px)',
         border: '1px solid rgba(255, 255, 255, 0.4)',
         transition: 'all 0.3s ease',
+        cursor: href ? 'pointer' : 'default',
+        textDecoration: 'none',
+        display: 'block',
         '&:hover': {
           bgcolor: 'rgba(255, 255, 255, 0.8)',
           transform: 'translateY(-5px)',
@@ -74,6 +81,7 @@ const BackgroundSlideshow = () => {
   const [index, setIndex] = useState(0);
   // Using user-provided campus images stored in public/backgrounds
   const images = [
+    "/campus_main.jpg",
     "/backgrounds/bg1.gif",
     "/backgrounds/bg2.jpeg",
     "/backgrounds/bg3.jpeg",
@@ -149,6 +157,8 @@ const BackgroundSlideshow = () => {
     </Box>
   );
 };
+
+import { IIT_ISM_LOGO } from "@/lib/logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -256,44 +266,51 @@ export default function LoginPage() {
             transition={{ duration: 1.2, ease: "easeOut" }}
           >
             <Box sx={{ textAlign: 'center', mb: 6 }}>
-              <Stack direction="row" spacing={3} alignItems="center" justifyContent="center" sx={{ mb: 2 }}>
-                <motion.img 
-                  src="https://upload.wikimedia.org/wikipedia/en/3/3a/Indian_Institute_of_Technology_%28Indian_School_of_Mines%29%2C_Dhanbad_Logo.png" 
-                  alt="IIT (ISM) Dhanbad Logo" 
-                  crossOrigin="anonymous"
-                  referrerPolicy="no-referrer"
-                  style={{ 
-                    width: 140, 
-                    height: 140, 
-                    objectFit: 'contain',
-                    filter: 'drop-shadow(0 4px 12px rgba(0,77,64,0.3))'
-                  }}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ 
-                    opacity: 1, 
-                    scale: 1,
-                    rotateY: [0, 360],
-                  }}
+              <Stack direction="row" spacing={3} alignItems="center" justifyContent="center" sx={{ mb: 4 }}>
+                <Box 
+                  component={motion.div} 
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1, rotateY: 360 }}
                   transition={{ 
-                    rotateY: { duration: 20, repeat: Infinity, ease: "linear" },
+                    rotateY: { duration: 15, repeat: Infinity, ease: "linear" },
                     default: { duration: 0.8 }
                   }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "https://www.iitism.ac.in/assets/img/logo.png";
+                  sx={{ 
+                    width: { xs: 80, md: 120 }, 
+                    height: { xs: 80, md: 120 },
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    bgcolor: '#fff',
+                    p: 0.5,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
                   }}
-                />
-                <Box>
+                >
+                  <img 
+                    src={IIT_ISM_LOGO} 
+                    alt="IIT (ISM) Dhanbad Logo" 
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'contain', 
+                      borderRadius: '50%'
+                    }} 
+                  />
+                </Box>
+                <Box sx={{ textAlign: 'left' }}>
                   <Typography 
                     variant="h2" 
                     component="h1" 
                     sx={{ 
                       fontWeight: 900, 
-                      color: "#004d40",
+                      color: "#fff",
                       mb: 0,
-                      fontSize: { xs: '2rem', md: '4rem' },
+                      fontSize: { xs: '1.8rem', md: '3.5rem' },
                       letterSpacing: -1,
-                      lineHeight: 1.1,
-                      textShadow: '0 2px 4px rgba(255,255,255,0.8)'
+                      lineHeight: 1,
+                      textShadow: '0 4px 20px rgba(0,0,0,0.3)'
                     }}
                   >
                     IIT (ISM) DHANBAD
@@ -302,11 +319,11 @@ export default function LoginPage() {
                     variant="h4" 
                     sx={{ 
                       fontWeight: 700, 
-                      color: "#00796b", 
-                      letterSpacing: 3,
-                      fontSize: { xs: '1rem', md: '1.8rem' },
+                      color: "#b2dfdb", 
+                      letterSpacing: { xs: 2, md: 4 },
+                      fontSize: { xs: '0.9rem', md: '1.5rem' },
                       mt: 1,
-                      textShadow: '0 2px 4px rgba(255,255,255,0.8)'
+                      textShadow: '0 2px 10px rgba(0,0,0,0.2)'
                     }}
                   >
                     RECRUITER ACCESS PORTAL
@@ -557,6 +574,7 @@ export default function LoginPage() {
                 delay={0.4}
                 icon={Info}
                 title="About IIT (ISM) Dhanbad"
+                href="https://www.iitism.ac.in/"
                 content="Established in 1926, IIT (ISM) Dhanbad is an institution of national importance with a century-long legacy in Earth Sciences and Engineering. Our world-class faculty and cutting-edge research facilities nurture the brightest minds in the country, producing industry-ready professionals across diverse domains of technology and management."
               />
             </Box>
@@ -565,6 +583,7 @@ export default function LoginPage() {
                 delay={0.6}
                 icon={Users}
                 title="Meet Our CDC"
+                href="https://www.iitism.ac.in/career-development-centre"
                 content="The Career Development Cell (CDC) at IIT (ISM) Dhanbad acts as a vital bridge between academia and the professional world. Our dedicated team facilitates seamless recruitment processes, internship drives, and corporate interactions, ensuring that our recruiters find the perfect talent match while our students achieve their career aspirations."
               />
             </Box>

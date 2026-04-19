@@ -5,6 +5,8 @@ import { Box, Button, Container, Grid2 as Grid, Typography, Paper, Stack } from 
 import { motion } from "framer-motion";
 import { Briefcase, GraduationCap, ArrowRight, Sparkles } from "lucide-react";
 
+import { IIT_ISM_LOGO } from "@/lib/logo";
+
 export default function PortalSelectPage() {
   const router = useRouter();
 
@@ -24,6 +26,34 @@ export default function PortalSelectPage() {
           transition={{ duration: 0.8 }}
         >
           <Box sx={{ textAlign: 'center', mb: 8 }}>
+            <Box 
+              component={motion.div} 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, rotateY: 360 }}
+              transition={{ 
+                rotateY: { duration: 15, repeat: Infinity, ease: "linear" },
+                default: { duration: 0.8 }
+              }}
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                mb: 4,
+                mx: 'auto',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                width: 120,
+                height: 120,
+                bgcolor: '#fff',
+                p: 0.5,
+                boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+              }}
+            >
+              <img 
+                src={IIT_ISM_LOGO} 
+                alt="IIT (ISM) Dhanbad Logo" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }}
+              />
+            </Box>
             <Typography variant="h6" sx={{ letterSpacing: 4, color: "text.secondary", fontWeight: 300, mb: 1, textTransform: 'uppercase' }}>
               Select Workspace
             </Typography>

@@ -173,6 +173,7 @@ type TabData = {
   form: JnfForm | InfForm;
   activeStep: number;
   isDirty: boolean;
+  initialFingerprint?: string; // Used to check for changes in rejected applications
 };
 
 export default function JobsPage() {
@@ -399,9 +400,14 @@ function JobsPageContent() {
     // Company registration details are ALWAYS read-only in this view
     if (fieldName?.startsWith('company.')) return true;
     
-    // Once approved or rejected, NO ONE can edit
-    if (activeTab?.form.status && ['approved', 'rejected', 'selected'].includes(activeTab.form.status)) {
+    // Once approved, NO ONE can edit
+    if (activeTab?.form.status && ['approved', 'selected'].includes(activeTab.form.status)) {
       return true;
+    }
+
+    // Rejected profiles can be edited for "Reapply"
+    if (activeTab?.form.status === 'rejected') {
+      return false;
     }
 
     // If explicit view mode is requested, everything is read-only
@@ -499,7 +505,8 @@ function JobsPageContent() {
       title: mergedForm.profile_name || title,
       form: mergedForm,
       activeStep: mergedForm.last_completed_step || 0,
-      isDirty: false
+      isDirty: false,
+      initialFingerprint: mergedForm.status === 'rejected' ? getFormFingerprint(mergedForm) : undefined
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(id);
@@ -807,14 +814,19 @@ function JobsPageContent() {
       }
 
       setIsSaving(true);
-      // 2. Check for duplicates with identical content
+      // 2. Check for duplicates and re-submission of rejected profiles
       const fingerprints = new Map<string, string>(); // fingerprint -> tab title
-      
-      // We also need to check against the original parent content if it exists but isn't open in a tab
-      // However, for this UI, we assume all relevant profiles are open in tabs for submission.
       
       for (const tab of tabs) {
         const fp = getFormFingerprint(tab.form);
+        
+        // Re-submission check for rejected profiles
+        if (tab.form.status === 'rejected' && tab.initialFingerprint && fp === tab.initialFingerprint) {
+          setError(`Error: No changes detected in "${tab.title}". You must make changes before reapplying for a rejected profile.`);
+          setIsSaving(false);
+          return;
+        }
+
         if (fingerprints.has(fp)) {
           setError(`Error: "${tab.title}" has identical information to "${fingerprints.get(fp)}". No changes were made to this duplicate, so it cannot be accepted.`);
           setIsSaving(false);
@@ -1287,6 +1299,7 @@ function JobsPageContent() {
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'rgba(0,121,107,0.05)' }}>
                     <TableCell sx={{ fontWeight: 800, color: '#004d40', py: 3, pl: 4 }}>PROFILE NAME</TableCell>
+                    <TableCell sx={{ fontWeight: 800, color: '#004d40', py: 3 }}>TYPE</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#004d40', py: 3 }}>STATUS</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#004d40', py: 3 }}>LAST STEP</TableCell>
                     <TableCell sx={{ fontWeight: 800, color: '#004d40', py: 3 }}>DATE & TIME</TableCell>
@@ -1296,7 +1309,7 @@ function JobsPageContent() {
                 <TableBody>
                   {jobs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 12 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 12 }}>
                         <Box sx={{ opacity: 0.2, mb: 3, color: '#00796b' }}><Briefcase size={80} /></Box>
                         <Typography variant="h5" sx={{ color: '#004d40', fontWeight: 700, mb: 1 }}>No profiles found</Typography>
                         <Typography color="text.secondary">Create your first recruitment notification to get started.</Typography>
@@ -1311,13 +1324,25 @@ function JobsPageContent() {
                       >
                         <TableCell sx={{ fontWeight: 700, color: '#004d40', pl: 4 }}>{job.profile_name}</TableCell>
                         <TableCell>
+                          <Chip 
+                            label={job.job_type} 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 800, 
+                              bgcolor: job.job_type === 'INF' ? '#e0f2f1' : '#e0f7fa',
+                              color: job.job_type === 'INF' ? '#00695c' : '#006064'
+                            }} 
+                          />
+                        </TableCell>
+                        <TableCell>
                           {(() => {
                             const isPositive = (job.status as string) === 'approved' || (job.status as string) === 'selected';
                             const isRejected = (job.status as string) === 'rejected';
                             const isSubmitted = (job.status as string) === 'submitted';
+                            const isPending = (job.status as string) === 'draft' || (job.status as string) === 'pending';
                             return (
                               <Chip 
-                                label={(job.status as string).toUpperCase()} 
+                                label={isPending ? "PENDING" : (job.status as string).toUpperCase()} 
                                 size="small" 
                                 sx={{ 
                                   fontWeight: 900, 
@@ -1348,28 +1373,36 @@ function JobsPageContent() {
                         </TableCell>
                         <TableCell align="right" sx={{ pr: 4 }}>
                           <Stack direction="row" spacing={1.5} justifyContent="flex-end">
-                            <Tooltip title="Duplicate">
-                              <IconButton 
-                                size="small" 
-                                onClick={() => duplicateJobFromList(job.job_id)}
-                                sx={{ color: '#00796b', bgcolor: 'rgba(0,121,107,0.05)', '&:hover': { bgcolor: 'rgba(0,121,107,0.1)' } }}
-                              >
-                                <Copy size={18} />
-                              </IconButton>
+                            <Tooltip title={job.status === 'approved' ? "Approved profiles cannot be duplicated" : "Duplicate"}>
+                              <span>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => duplicateJobFromList(job.job_id)}
+                                  disabled={job.status === 'approved'}
+                                  sx={{ color: '#00796b', bgcolor: 'rgba(0,121,107,0.05)', '&:hover': { bgcolor: 'rgba(0,121,107,0.1)' } }}
+                                >
+                                  <Copy size={18} />
+                                </IconButton>
+                              </span>
                             </Tooltip>
                             <Button 
                               variant="contained" 
                               size="small" 
                               onClick={() => resumeJob(job)}
+                              disabled={job.status === 'approved'}
                               sx={{ 
                                 borderRadius: 2, 
                                 fontWeight: 800, 
                                 fontSize: '0.75rem',
-                                background: job.status === 'submitted' ? 'linear-gradient(135deg, #00796b 0%, #004d40 100%)' : 'linear-gradient(135deg, #fb8c00 0%, #ef6c00 100%)',
+                                background: job.status === 'submitted' ? 'linear-gradient(135deg, #00796b 0%, #004d40 100%)' : 
+                                            job.status === 'rejected' ? 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)' :
+                                            'linear-gradient(135deg, #fb8c00 0%, #ef6c00 100%)',
                                 px: 2
                               }}
                             >
-                              {job.status === 'submitted' ? "View Details" : "Resume Edit"}
+                              {job.status === 'submitted' ? "View Details" : 
+                               job.status === 'rejected' ? "Reapply" : 
+                               job.status === 'approved' ? "Locked" : "Resume Edit"}
                             </Button>
                           </Stack>
                         </TableCell>
@@ -2570,6 +2603,19 @@ function JobsPageContent() {
                       
                       <Stack spacing={3} sx={{ bgcolor: 'rgba(0,0,0,0.02)', p: 4, borderRadius: 2, border: '1px solid rgba(0,0,0,0.05)', mb: 4 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#00796b', mb: 1 }}>AIPC GUIDELINES ACKNOWLEDGEMENT</Typography>
+                        <Box sx={{ mb: 2 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            component="a"
+                            href="https://people.iitism.ac.in/~download/cdc/AIPC_Guidelines_2023.pdf"
+                            target="_blank"
+                            startIcon={<FileText size={16} />}
+                            sx={{ borderRadius: 2, fontWeight: 700, borderColor: '#00796b', color: '#00796b' }}
+                          >
+                            VIEW AIPC GUIDELINES
+                          </Button>
+                        </Box>
                         {(activeTab.form.job_type === "JNF" ? jnfAipcGuidelineItems : infAipcGuidelineItems).map((item) => (
                           <Box key={item.key} sx={{ display: 'flex', alignItems: 'flex-start' }}>
                             <Checkbox 

@@ -29,6 +29,8 @@ const FloatingIcon = ({ children, delay = 0, initialX = 0, initialY = 0 }: { chi
   </Box>
 );
 
+import { IIT_ISM_LOGO } from "@/lib/logo";
+
 export default function AlumniMentorshipPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -148,6 +150,30 @@ export default function AlumniMentorshipPage() {
           transition={{ duration: 1.2, ease: "easeOut" }}
         >
           <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Box 
+              component={motion.div} 
+              animate={{ rotateY: 360 }} 
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                mb: 3,
+                mx: 'auto',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                width: 100,
+                height: 100,
+                bgcolor: '#fff',
+                p: 0.5,
+                boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+              }}
+            >
+              <img 
+                src={IIT_ISM_LOGO} 
+                alt="IIT (ISM) Dhanbad Logo" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '50%' }}
+              />
+            </Box>
             <Typography variant="h3" component="h1" sx={{ fontWeight: 800, color: "#004d40", mb: 1 }}>
               ALUMNI MENTORSHIP
             </Typography>
