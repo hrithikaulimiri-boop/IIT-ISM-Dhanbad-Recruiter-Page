@@ -618,7 +618,9 @@ function ApplicationsContent() {
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Sector" value={selectedJob.company?.sector} /></Grid>
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Employees" value={selectedJob.company?.employee_count} /></Grid>
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Turnover" value={selectedJob.company?.annual_turnover} /></Grid>
-                    <Grid size={{ xs: 12 }}><DetailItem label="Postal Address" value={selectedJob.company?.postal_address} icon={<MapPin size={18} />} /></Grid>
+                    <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Established" value={selectedJob.company?.established_year} /></Grid>
+                    <Grid size={{ xs: 12, md: 8 }}><DetailItem label="Social Media" value={selectedJob.company?.social_media} isLink /></Grid>
+                    <Grid size={{ xs: 12 }}><DetailItem label="Postal Address" value={`${selectedJob.company?.postal_address || ""}${selectedJob.company?.city ? `, ${selectedJob.company.city}` : ""}${selectedJob.company?.state ? `, ${selectedJob.company.state}` : ""}${selectedJob.company?.country ? `, ${selectedJob.company.country}` : ""}${selectedJob.company?.pincode ? ` - ${selectedJob.company.pincode}` : ""}`} icon={<MapPin size={18} />} /></Grid>
                   </Grid>
                   
                   {selectedJob.company?.contacts && selectedJob.company.contacts.length > 0 && (
@@ -658,21 +660,19 @@ function ApplicationsContent() {
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Work Mode" value={selectedJob.work_mode} /></Grid>
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Job Category" value={selectedJob.job_categories} /></Grid>
                     <Grid size={{ xs: 12, md: 6 }}><DetailItem label="General Location" value={selectedJob.location} icon={<Globe size={18} />} /></Grid>
-                    <Grid size={{ xs: 12, md: 6 }}><DetailItem label="Specific Posting" value={selectedJob.place_of_posting} /></Grid>
+                    <Grid size={{ xs: 12, md: 6 }}><DetailItem label="Specific Posting" value={selectedJob.place_of_posting || selectedJob.offline_job_location} /></Grid>
                     
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Expected Hires" value={selectedJob.expected_hires} /></Grid>
-                    {selectedJob.job_type === 'JNF' && (
-                      <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Joining Month" value={selectedJob.joining_month} /></Grid>
-                    )}
+                    <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Minimum Hires" value={selectedJob.min_hires} /></Grid>
+                    <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Joining Month" value={selectedJob.joining_month} /></Grid>
+                    
                     <Grid size={{ xs: 12, md: 4 }}><DetailItem label="Training Period" value={selectedJob.training_period} /></Grid>
+                    <Grid size={{ xs: 12, md: 8 }}><DetailItem label="Registration Link" value={selectedJob.registration_link} icon={<ExternalLink size={18} />} isLink /></Grid>
                     
                     <Grid size={{ xs: 12 }}><DetailItem label="Required Skills" value={selectedJob.required_skills} icon={<ListChecks size={18} />} /></Grid>
                     <Grid size={{ xs: 12 }}><DetailItem label="Job Description" value={selectedJob.description} icon={<FileText size={18} />} fullWidth /></Grid>
                     <Grid size={{ xs: 12, md: 6 }}><DetailItem label="Bond Details" value={selectedJob.bond} icon={<ShieldCheck size={18} />} /></Grid>
-                    
-                    {selectedJob.job_type === 'INF' && (
-                      <Grid size={{ xs: 12, md: 6 }}><DetailItem label="PPO Provision" value={selectedJob.ppo_provision} /></Grid>
-                    )}
+                    <Grid size={{ xs: 12, md: 6 }}><DetailItem label="PPO Provision" value={selectedJob.ppo_provision} /></Grid>
                     
                     <Grid size={{ xs: 12 }}><DetailItem label="Onboarding Procedure" value={selectedJob.onboarding_procedure} /></Grid>
                     <Grid size={{ xs: 12 }}><DetailItem label="Additional Information" value={selectedJob.additional_info || selectedJob.additional_info_1000} /></Grid>
@@ -749,6 +749,8 @@ function ApplicationsContent() {
                                 <>
                                   <TableCell sx={{ fontWeight: 800, color: '#004d40' }}>STIPEND</TableCell>
                                   <TableCell sx={{ fontWeight: 800, color: '#004d40' }}>HRA</TableCell>
+                                  <TableCell sx={{ fontWeight: 800, color: '#004d40' }}>VAR. PAY</TableCell>
+                                  <TableCell sx={{ fontWeight: 800, color: '#004d40' }}>OTHER</TableCell>
                                   <TableCell sx={{ fontWeight: 800, color: '#004d40' }}>TOTAL</TableCell>
                                 </>
                               )}
@@ -770,6 +772,8 @@ function ApplicationsContent() {
                                     <>
                                       <TableCell>{s.base_stipend}</TableCell>
                                       <TableCell>{s.hra}</TableCell>
+                                      <TableCell>{s.variable_pay}</TableCell>
+                                      <TableCell>{s.other}</TableCell>
                                       <TableCell>{s.total}</TableCell>
                                     </>
                                   )}

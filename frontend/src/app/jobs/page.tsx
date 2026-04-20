@@ -62,9 +62,16 @@ interface StipendStructure {
 interface AdditionalSalary {
   joining_bonus: string;
   retention_bonus: string;
-  bond_deductions: string;
+  variable_performance_bonus: string;
   esops_vest_period: string;
   relocation_allowance: string;
+  medical_allowance: string;
+  deductions: string;
+  bond_amount_duration: string;
+  first_year_ctc: string;
+  stocks_options: string;
+  ctc_breakup: string;
+  gross_salary: string;
 }
 
 interface BaseForm {
@@ -97,6 +104,7 @@ interface BaseForm {
   has_psychometric_test: boolean;
   has_medical_test: boolean;
   other_screening_details: string;
+  jd_pdf_url?: string; // New field for JD PDF upload
   company?: {
     name: string;
     website: string;
@@ -123,6 +131,7 @@ interface BaseForm {
     global_max_backlogs: string;
     high_school_percentage: string;
     gender_filter: string;
+    other_requirements: string;
     disciplines_json: EligibilityRule[];
   };
   declaration: { 
@@ -204,9 +213,16 @@ const buildInitialEligibility = (): EligibilityRule[] => {
 const initialAdditionalSalary = (): AdditionalSalary => ({
   joining_bonus: "",
   retention_bonus: "",
-  bond_deductions: "",
+  variable_performance_bonus: "",
   esops_vest_period: "",
-  relocation_allowance: ""
+  relocation_allowance: "",
+  medical_allowance: "",
+  deductions: "",
+  bond_amount_duration: "",
+  first_year_ctc: "",
+  stocks_options: "",
+  ctc_breakup: "",
+  gross_salary: "",
 });
 
 const defaultHiringStagesData = [
@@ -277,6 +293,7 @@ const getInitialJnf = (aipc: Record<string, boolean>, cycleId: number = 1): JnfF
     global_max_backlogs: "0",
     high_school_percentage: "0",
     gender_filter: "All",
+    other_requirements: "",
     disciplines_json: buildInitialEligibility(),
   },
   declaration: { 
@@ -342,6 +359,7 @@ const getInitialInf = (aipc: Record<string, boolean>, cycleId: number = 1): InfF
     global_max_backlogs: "0",
     high_school_percentage: "0",
     gender_filter: "All",
+    other_requirements: "",
     disciplines_json: buildInitialEligibility(),
   },
   declaration: { 
@@ -548,6 +566,9 @@ function JobsPageContent() {
   const performDuplicate = () => {
     if (!activeTab) return;
     const clonedForm = JSON.parse(JSON.stringify(activeTab.form));
+    
+    // Set parent_job_id to the original job's ID (or its own parent if it's already a child)
+    clonedForm.parent_job_id = activeTab.form.parent_job_id || activeTab.form.job_id;
     clonedForm.job_id = undefined; // Cloned form should be new
     
     // Naming logic
@@ -1035,7 +1056,7 @@ function JobsPageContent() {
             const extSal = extracted.salary;
             if (extSal.joining_bonus) additional.global.joining_bonus = extSal.joining_bonus.toString();
             if (extSal.retention_bonus) additional.global.retention_bonus = extSal.retention_bonus.toString();
-            if (extSal.bond_deductions) additional.global.bond_deductions = extSal.bond_deductions.toString();
+            if (extSal.bond_deductions) additional.global.deductions = extSal.bond_deductions.toString();
             if (extSal.relocation_allowance) additional.global.relocation_allowance = extSal.relocation_allowance.toString();
             if (extSal.esops) additional.global.esops_vest_period = extSal.esops.toString();
 
@@ -1618,8 +1639,8 @@ function JobsPageContent() {
 
                       <Grid size={6}>
                         <TextField
-                          label="Profile Name / Job Title *"
-                          placeholder="e.g. Senior Software Engineer"
+                          label={activeTab.form.job_type === "INF" ? "Internship Title *" : "Profile Name / Job Title *"}
+                          placeholder={activeTab.form.job_type === "INF" ? "e.g. Software Engineering Intern" : "e.g. Senior Software Engineer"}
                           fullWidth
                           required
                           value={activeTab.form.profile_name ?? ""}
@@ -1631,6 +1652,7 @@ function JobsPageContent() {
                       <Grid size={6}>
                         <TextField
                           label="Job Designation (formal title)"
+                          placeholder="e.g. Software Developer Engineer - I"
                           fullWidth
                           value={activeTab.form.job_designation ?? ""}
                           disabled={isReadOnly()}
@@ -1641,6 +1663,7 @@ function JobsPageContent() {
                       <Grid size={6}>
                         <TextField
                           label="Place of Posting *"
+                          placeholder="e.g. Bengaluru, Karnataka"
                           fullWidth
                           required
                           value={activeTab.form.place_of_posting ?? ""}
@@ -1659,15 +1682,15 @@ function JobsPageContent() {
                             disabled={isReadOnly()}
                             onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, work_mode: e.target.value as any } }))}
                           >
-                            <MenuItem value="online">Remote</MenuItem>
-                            <MenuItem value="offline">On-site</MenuItem>
+                            <MenuItem value="online">Remote / Work from Home</MenuItem>
+                            <MenuItem value="offline">On-site / Office</MenuItem>
                             <MenuItem value="hybrid">Hybrid</MenuItem>
                           </Select>
                         </FormControl>
                       </Grid>
                       <Grid size={3}>
                         <TextField
-                          label="Expected Hires *"
+                          label="Expected Number of Hires *"
                           fullWidth
                           required
                           type="number"
@@ -1679,7 +1702,7 @@ function JobsPageContent() {
                       </Grid>
                       <Grid size={3}>
                         <TextField
-                          label="Minimum Hires"
+                          label="Minimum Number of Hires"
                           fullWidth
                           type="number"
                           value={activeTab.form.min_hires ?? ""}
@@ -1691,6 +1714,7 @@ function JobsPageContent() {
                       <Grid size={6}>
                         <TextField
                           label="Tentative Joining Month *"
+                          placeholder="e.g. July 2026"
                           fullWidth
                           required
                           value={activeTab.form.joining_month ?? ""}
@@ -1701,12 +1725,12 @@ function JobsPageContent() {
                       </Grid>
                       <Grid size={12}>
                         <TextField
-                          label="Job Description *"
+                          label={activeTab.form.job_type === "INF" ? "Internship Description (Rich Text Editor) *" : "Job Description (Rich Text Editor) *"}
                           fullWidth
                           multiline
-                          rows={4}
+                          rows={6}
                           required
-                          placeholder="Rich text content here..."
+                          placeholder={activeTab.form.job_type === "INF" ? "Enter detailed internship roles, learning objectives, and summary..." : "Enter detailed roles, responsibilities, and job summary..."}
                           value={activeTab.form.description ?? ""}
                           disabled={isReadOnly()}
                           onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, description: e.target.value } }))}
@@ -1714,10 +1738,32 @@ function JobsPageContent() {
                         />
                       </Grid>
                       <Grid size={12}>
+                        <Button
+                          component="label"
+                          variant="outlined"
+                          startIcon={<Upload size={18} />}
+                          disabled={isReadOnly()}
+                          sx={{ borderRadius: 4, py: 1.5, px: 3, borderColor: 'rgba(0,0,0,0.2)', color: 'text.secondary', textTransform: 'none', fontWeight: 600, width: '100%', justifyContent: 'flex-start' }}
+                        >
+                          {activeTab.form.jd_pdf_url ? `${activeTab.form.job_type === "INF" ? "Internship Description" : "Job Description"} Uploaded: ${activeTab.form.jd_pdf_url}` : `Upload ${activeTab.form.job_type === "INF" ? "Internship Description" : "Job Description"} as PDF (Optional)`}
+                          <input
+                            type="file"
+                            hidden
+                            accept="application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                updateActiveTab(prev => ({ ...prev, form: { ...prev.form, jd_pdf_url: file.name } }));
+                              }
+                            }}
+                          />
+                        </Button>
+                      </Grid>
+                      <Grid size={12}>
                         <TextField
-                          label="Required Skills (comma separated)"
+                          label="Required Skills (tag input - comma separated)"
                           fullWidth
-                          placeholder="Python, React, AWS..."
+                          placeholder="e.g. Python, React, Data Structures, Problem Solving"
                           value={activeTab.form.required_skills?.join(", ") ?? ""}
                           disabled={isReadOnly()}
                           onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, required_skills: e.target.value.split(",").map(s => s.trim()) } }))}
@@ -1726,7 +1772,7 @@ function JobsPageContent() {
                       </Grid>
                       <Grid size={12}>
                         <TextField
-                          label="Additional Job Info (max 1000 chars)"
+                          label="Additional Job Information (Maximum 1000 characters)"
                           fullWidth
                           multiline
                           rows={3}
@@ -1739,7 +1785,8 @@ function JobsPageContent() {
                       </Grid>
                       <Grid size={6}>
                         <TextField
-                          label="PPO Provision on Performance"
+                          label="Pre-Placement Offer (PPO) Provision on Performance"
+                          placeholder="e.g. Performance-based conversion available"
                           fullWidth
                           value={activeTab.form.ppo_provision ?? ""}
                           disabled={isReadOnly()}
@@ -1749,17 +1796,8 @@ function JobsPageContent() {
                       </Grid>
                       <Grid size={6}>
                         <TextField
-                          label="Registration Link (if any)"
-                          fullWidth
-                          value={activeTab.form.registration_link ?? ""}
-                          disabled={isReadOnly()}
-                          onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, registration_link: e.target.value } }))}
-                          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)' } }}
-                        />
-                      </Grid>
-                      <Grid size={6}>
-                        <TextField
                           label="Bond Details (if any)"
+                          placeholder="e.g. 2-year service agreement"
                           fullWidth
                           value={activeTab.form.bond ?? ""}
                           disabled={isReadOnly()}
@@ -1770,6 +1808,7 @@ function JobsPageContent() {
                       <Grid size={6}>
                         <TextField
                           label="Registration Link (if any)"
+                          placeholder="https://company-portal.com/careers/job123"
                           fullWidth
                           value={activeTab.form.registration_link ?? ""}
                           disabled={isReadOnly()}
@@ -1777,9 +1816,10 @@ function JobsPageContent() {
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)' } }}
                         />
                       </Grid>
-                      <Grid size={12}>
+                      <Grid size={6}>
                         <TextField
-                          label="Onboarding Procedure"
+                          label="Onboarding Procedure to Company"
+                          placeholder="e.g. Virtual orientation followed by 1-week in-office training"
                           fullWidth
                           multiline
                           rows={2}
@@ -1789,6 +1829,22 @@ function JobsPageContent() {
                           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)' } }}
                         />
                       </Grid>
+                      {activeTab.form.job_type === "INF" && (
+                        <Grid size={6}>
+                          <TextField
+                            label="Expected Duration of Internship"
+                            placeholder="e.g. 2 months"
+                            fullWidth
+                            value={(activeTab.form as InfForm).salary.internship_duration ?? ""}
+                            disabled={isReadOnly()}
+                            onChange={(e) => {
+                              const internship_duration = e.target.value;
+                              updateActiveTab(prev => ({ ...prev, form: { ...prev.form, salary: { ...prev.form.salary, internship_duration } } } as any));
+                            }}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)' } }}
+                          />
+                        </Grid>
+                      )}
                     </Grid>
                   )}
 
@@ -1797,9 +1853,9 @@ function JobsPageContent() {
                       <Paper sx={{ p: 3, mb: 4, bgcolor: 'rgba(0, 121, 107, 0.05)', borderRadius: 2, border: '1px solid rgba(0, 121, 107, 0.1)' }}>
                         <Grid container spacing={3} alignItems="center">
                           <Grid size={12}><Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#004d40', mb: 1 }}>GLOBAL BRANCH ELIGIBILITY CRITERIA</Typography></Grid>
-                          <Grid size={2}>
+                          <Grid size={3}>
                             <TextField
-                              label="Global Min. CGPA"
+                              label="Global Minimum CGPA / CPI"
                               fullWidth
                               type="number"
                               value={activeTab.form.eligibility.global_min_cgpa ?? ""}
@@ -1807,7 +1863,7 @@ function JobsPageContent() {
                               onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, global_min_cgpa: e.target.value } } }))}
                             />
                           </Grid>
-                          <Grid size={2}>
+                          <Grid size={3}>
                             <FormControlLabel
                               control={
                                 <Checkbox 
@@ -1816,12 +1872,12 @@ function JobsPageContent() {
                                   onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, global_allow_backlogs: e.target.checked } } }))}
                                 />
                               }
-                              label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Allow Backlogs</Typography>}
+                              label={<Typography variant="body2" sx={{ fontWeight: 700 }}>Allow Active Backlogs</Typography>}
                             />
                           </Grid>
-                          <Grid size={2}>
+                          <Grid size={3}>
                             <TextField
-                              label="Global Max. Backlogs"
+                              label="Global Maximum Backlogs"
                               fullWidth
                               type="number"
                               disabled={isReadOnly() || !activeTab.form.eligibility.global_allow_backlogs}
@@ -1829,7 +1885,43 @@ function JobsPageContent() {
                               onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, global_max_backlogs: e.target.value } } }))}
                             />
                           </Grid>
-                          <Grid size={1.5}>
+                          <Grid size={3}>
+                            <TextField
+                              label="High School (Class 12) Percentage"
+                              fullWidth
+                              type="number"
+                              value={activeTab.form.eligibility.high_school_percentage ?? ""}
+                              disabled={isReadOnly()}
+                              onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, high_school_percentage: e.target.value } } }))}
+                            />
+                          </Grid>
+                          <Grid size={3}>
+                            <FormControl fullWidth>
+                              <InputLabel>Gender Filter</InputLabel>
+                              <Select
+                                value={activeTab.form.eligibility.gender_filter ?? "All"}
+                                label="Gender Filter"
+                                disabled={isReadOnly()}
+                                onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, gender_filter: e.target.value } } }))}
+                              >
+                                <MenuItem value="All">All Students</MenuItem>
+                                <MenuItem value="Male">Male Students Only</MenuItem>
+                                <MenuItem value="Female">Female Students Only</MenuItem>
+                                <MenuItem value="Others">Others</MenuItem>
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid size={6}>
+                            <TextField
+                              label="Any Specific Requirements (e.g. SLP related or others)"
+                              fullWidth
+                              placeholder="Enter any additional eligibility requirements..."
+                              value={activeTab.form.eligibility.other_requirements ?? ""}
+                              disabled={isReadOnly()}
+                              onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, other_requirements: e.target.value } } }))}
+                            />
+                          </Grid>
+                          <Grid size={3}>
                             <Button 
                               variant="contained" 
                               fullWidth
@@ -1850,50 +1942,6 @@ function JobsPageContent() {
                             >
                               Apply to All Selected
                             </Button>
-                          </Grid>
-                          <Grid size={1.5}>
-                            <Button 
-                              variant="outlined" 
-                              fullWidth
-                              disabled={isReadOnly()}
-                              onClick={() => {
-                                const allSelected = activeTab.form.eligibility.disciplines_json.every(r => r.selected);
-                                const newRules = activeTab.form.eligibility.disciplines_json.map(r => ({
-                                  ...r,
-                                  selected: !allSelected
-                                }));
-                                updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, disciplines_json: newRules } } }));
-                              }}
-                              sx={{ height: '56px', fontWeight: 700, borderColor: '#00796b', color: '#00796b' }}
-                            >
-                              {activeTab.form.eligibility.disciplines_json.every(r => r.selected) ? "Deselect All" : "Select All"}
-                            </Button>
-                          </Grid>
-                          <Grid size={1.5}>
-                            <TextField
-                              label="High School %"
-                              fullWidth
-                              type="number"
-                              value={activeTab.form.eligibility.high_school_percentage ?? ""}
-                              disabled={isReadOnly()}
-                              onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, high_school_percentage: e.target.value } } }))}
-                            />
-                          </Grid>
-                          <Grid size={1.5}>
-                            <FormControl fullWidth>
-                              <InputLabel>Gender</InputLabel>
-                              <Select
-                                value={activeTab.form.eligibility.gender_filter ?? "All"}
-                                label="Gender"
-                                disabled={isReadOnly()}
-                                onChange={(e) => updateActiveTab(prev => ({ ...prev, form: { ...prev.form, eligibility: { ...prev.form.eligibility, gender_filter: e.target.value } } }))}
-                              >
-                                <MenuItem value="All">All</MenuItem>
-                                <MenuItem value="Male">Male</MenuItem>
-                                <MenuItem value="Female">Female</MenuItem>
-                                <MenuItem value="Others">Others</MenuItem>
-                              </Select>
-                            </FormControl>
                           </Grid>
                         </Grid>
                       </Paper>
@@ -2075,8 +2123,8 @@ function JobsPageContent() {
                             <Grid container spacing={3} alignItems="center">
                               <Grid size={12}><Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#004d40', mb: 1 }}>GLOBAL SALARY VALUES (APPLY TO SELECTED PROGRAMMES)</Typography></Grid>
                               <Grid size={2.5}><TextField label="CTC (Annual)" fullWidth size="small" id="global-ctc" disabled={isReadOnly()} /></Grid>
-                              <Grid size={2.5}><TextField label="Base/Fixed" fullWidth size="small" id="global-base" disabled={isReadOnly()} /></Grid>
-                              <Grid size={2.5}><TextField label="Take-home" fullWidth size="small" id="global-takehome" disabled={isReadOnly()} /></Grid>
+                              <Grid size={2.5}><TextField label="Base / Fixed" fullWidth size="small" id="global-base" disabled={isReadOnly()} /></Grid>
+                              <Grid size={2.5}><TextField label="In Hand" fullWidth size="small" id="global-takehome" disabled={isReadOnly()} /></Grid>
                               <Grid size={2}>
                                 <Button 
                                   variant="contained" 
@@ -2152,10 +2200,10 @@ function JobsPageContent() {
                                       }}
                                     />
                                   </TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Programme</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Programme (IIT Guwahati)</TableCell>
                                   <TableCell sx={{ fontWeight: 700 }}>CTC (Annual)</TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Base/Fixed</TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Monthly Take-home</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Base / Fixed</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>In Hand</TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
@@ -2231,18 +2279,33 @@ function JobsPageContent() {
                                   {key === "global" ? "Common Additional Components" : `${key} Components`}
                                 </Typography>
                                 <Grid container spacing={3}>
-                                  {["joining_bonus", "retention_bonus", "bond_deductions", "esops_vest_period", "relocation_allowance"].map(field => (
-                                    <Grid key={field} size={4}>
+                                  {[
+                                    { key: "joining_bonus", label: "Joining Bonus" },
+                                    { key: "retention_bonus", label: "Retention Bonus" },
+                                    { key: "variable_performance_bonus", label: "Variable / Performance Bonus" },
+                                    { key: "esops_vest_period", label: "ESOPs + Vest Period" },
+                                    { key: "relocation_allowance", label: "Relocation Allowance" },
+                                    { key: "medical_allowance", label: "Medical Allowance" },
+                                    { key: "deductions", label: "Deductions" },
+                                    { key: "bond_amount_duration", label: "Bond Amount + Duration" },
+                                    { key: "first_year_ctc", label: "First Year CTC" },
+                                    { key: "stocks_options", label: "Stocks / Options" },
+                                    { key: "ctc_breakup", label: "CTC Breakup (free text)" },
+                                    { key: "gross_salary", label: "Gross Salary" }
+                                  ].map(field => (
+                                    <Grid key={field.key} size={4}>
                                       <TextField
-                                        label={field.replace(/_/g, ' ').toUpperCase()}
+                                        label={field.label.toUpperCase()}
                                         fullWidth
                                         size="small"
+                                        multiline={field.key === "ctc_breakup"}
+                                        rows={field.key === "ctc_breakup" ? 2 : 1}
                                         disabled={isReadOnly()}
-                                        value={(activeTab.form as JnfForm).salary.additional_components?.[key]?.[field as keyof AdditionalSalary] ?? ""}
+                                        value={(activeTab.form as JnfForm).salary.additional_components?.[key]?.[field.key as keyof AdditionalSalary] ?? ""}
                                         onChange={(e) => {
                                           const newComponents = { ...((activeTab.form as JnfForm).salary.additional_components || {}) };
                                           if (!newComponents[key]) newComponents[key] = initialAdditionalSalary();
-                                          newComponents[key] = { ...newComponents[key], [field]: e.target.value };
+                                          newComponents[key] = { ...newComponents[key], [field.key]: e.target.value };
                                           updateActiveTab(prev => ({ ...prev, form: { ...prev.form, salary: { ...prev.form.salary, additional_components: newComponents } } } as any));
                                         }}
                                       />
@@ -2258,9 +2321,9 @@ function JobsPageContent() {
                           <Paper sx={{ p: 3, mb: 4, bgcolor: 'rgba(0, 121, 107, 0.05)', borderRadius: 2, border: '1px solid rgba(0, 121, 107, 0.1)' }}>
                             <Grid container spacing={3} alignItems="center">
                               <Grid size={12}><Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#004d40', mb: 1 }}>GLOBAL STIPEND VALUES (APPLY TO SELECTED PROGRAMMES)</Typography></Grid>
-                              <Grid size={2}><TextField label="Base Stipend" fullWidth size="small" id="global-stipend" disabled={isReadOnly()} /></Grid>
-                              <Grid size={2}><TextField label="HRA" fullWidth size="small" id="global-hra" disabled={isReadOnly()} /></Grid>
-                              <Grid size={2}><TextField label="Variable" fullWidth size="small" id="global-variable" disabled={isReadOnly()} /></Grid>
+                              <Grid size={2}><TextField label="Base Stipend (Monthly)" fullWidth size="small" id="global-stipend" disabled={isReadOnly()} /></Grid>
+                              <Grid size={2}><TextField label="HRA / Housing Allowance" fullWidth size="small" id="global-hra" disabled={isReadOnly()} /></Grid>
+                              <Grid size={2}><TextField label="Variable / Performance Pay" fullWidth size="small" id="global-variable" disabled={isReadOnly()} /></Grid>
                               <Grid size={2}><TextField label="Other" fullWidth size="small" id="global-other" disabled={isReadOnly()} /></Grid>
                               <Grid size={2}>
                                 <Button 
@@ -2340,10 +2403,10 @@ function JobsPageContent() {
                                       }}
                                     />
                                   </TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Programme</TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Base Stipend</TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>HRA</TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Variable Pay</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Programme (IIT Guwahati)</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Base Stipend (Monthly)</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>HRA / Housing Allowance</TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Variable / Performance Pay</TableCell>
                                   <TableCell sx={{ fontWeight: 700 }}>Other</TableCell>
                                   <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
                                 </TableRow>
@@ -2409,20 +2472,6 @@ function JobsPageContent() {
                           </Paper>
 
                           <Grid container spacing={4}>
-                            <Grid size={6}>
-                              <TextField
-                                label="Internship Duration"
-                                fullWidth
-                                disabled={isReadOnly()}
-                                placeholder="e.g. 2 months"
-                                value={(activeTab.form as InfForm).salary.internship_duration ?? ""}
-                                onChange={(e) => {
-                                  const internship_duration = e.target.value;
-                                  updateActiveTab(prev => ({ ...prev, form: { ...prev.form, salary: { ...prev.form.salary, internship_duration } } } as any));
-                                }}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)' } }}
-                              />
-                            </Grid>
                             <Grid size={12}>
                               <TextField
                                 label="Other Compensation / Perks"

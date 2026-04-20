@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\AlumniMentorship;
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\MentorshipSubmissionMail;
+use App\Mail\AdminMentorshipNotificationMail;
 
 class AlumniMentorshipController extends Controller
 {
@@ -40,6 +44,17 @@ class AlumniMentorshipController extends Controller
             ['email' => $validated['email']],
             $validated
         );
+
+        if ($application->status === 'submitted') {
+            // Notify the Alumnus
+            Mail::to($application->email)->send(new MentorshipSubmissionMail($application));
+            
+            // Notify Admins
+            $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
+            if (!empty($adminEmails)) {
+                Mail::to($adminEmails)->send(new AdminMentorshipNotificationMail($application));
+            }
+        }
 
         return response()->json([
             'message' => $application->status === 'draft' ? 'Draft saved successfully!' : 'Application submitted successfully!',
