@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Auth;
 use App\Mail\ApplicationStatusUpdatedMail;
+use App\Mail\JobProfileSubmittedMail;
+use App\Mail\AdminJobProfileNotificationMail;
 
 class ApplicationController extends Controller
 {
@@ -323,8 +325,31 @@ class ApplicationController extends Controller
             if ($user->role === 'recruiter' && (int)$job->company_id !== (int)$user->company_id) {
                 return response()->json(['message' => 'Forbidden'], 403);
             }
+            
+            $oldStatus = $job->status;
             $job->status = 'submitted';
             $job->save();
+
+            // Send notifications if transitioning to 'submitted'
+            if ($oldStatus !== 'submitted' && $user->role === 'recruiter') {
+                $job->load('company');
+                try {
+                    // Notify Recruiter
+                    Mail::to($user->email)->send(new JobProfileSubmittedMail($job));
+                    
+                    // Notify Admins
+                    $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
+                    if (!empty($adminEmails)) {
+                        Mail::to($adminEmails)->send(new AdminJobProfileNotificationMail($job));
+                    } else {
+                        $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+                        Mail::to($adminEmail)->send(new AdminJobProfileNotificationMail($job));
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Job submission notification mails failed: '.$e->getMessage());
+                }
+            }
+
             return response()->json(['message' => 'Submitted for approval', 'job' => $job]);
         }
 

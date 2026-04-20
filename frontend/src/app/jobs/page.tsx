@@ -806,8 +806,15 @@ function JobsPageContent() {
         }
 
         // Eligibility check
-        if (!form.eligibility.disciplines_json.some(d => d.selected)) {
+        const selectedDisciplines = form.eligibility.disciplines_json.filter(d => d.selected);
+        if (selectedDisciplines.length === 0) {
           missingFields.push("At least one eligible discipline");
+        } else {
+          // Ensure all selected disciplines have CGPA filled
+          const emptyCgpaDisciplines = selectedDisciplines.filter(d => !d.min_cgpa || d.min_cgpa === "");
+          if (emptyCgpaDisciplines.length > 0) {
+            missingFields.push(`CGPA/CPI missing for: ${emptyCgpaDisciplines.map(d => d.discipline).join(", ")}`);
+          }
         }
 
         // Declaration check

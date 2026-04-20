@@ -10,6 +10,9 @@ use App\Models\JobProfile;
 use App\Models\JobStage;
 use App\Models\RecruitmentCycle;
 use App\Models\Salary;
+use App\Models\User;
+use App\Mail\JobProfileSubmittedMail;
+use App\Mail\AdminJobProfileNotificationMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -170,12 +173,16 @@ class JobController extends Controller
 
         if (!$isDraft) {
             $this->assertDisciplinesMatchCourses($data['eligibility']['disciplines_json']);
+            $this->assertEligibilityComplete($data['eligibility']['disciplines_json']);
             $this->assertAipcGuidelinesComplete($data['declaration']['aipc_guidelines'] ?? [], $data['job_type']);
         }
 
         if ($user->role === 'recruiter') {
             $data['company_id'] = $user->company_id;
         }
+
+        $jobId = $data['job_id'] ?? null;
+        $oldStatus = $jobId ? JobProfile::where('job_id', $jobId)->value('status') : null;
 
         $payload = DB::transaction(function () use ($data, $user, $isDraft) {
             $jobId = $data['job_id'] ?? null;
@@ -298,16 +305,22 @@ class JobController extends Controller
             return $job;
         });
 
-        if ($data['status'] === 'submitted' && $user->role === 'recruiter') {
+        if ($data['status'] === 'submitted' && $oldStatus !== 'submitted' && $user->role === 'recruiter') {
             $payload->load('company');
             try {
-                Mail::raw("A new {$payload->job_type} application has been submitted by {$payload->company->name}.\n\nJob Profile: {$payload->profile_name}\nLocation: {$payload->location}\n\nPlease login to the admin portal to review and approve/reject the application.", function ($msg) use ($payload) {
-                    $msg->to(env('ADMIN_EMAIL', 'admin@example.com'))
-                        ->from('no-reply@campus.local', 'Campus Recruitment System')
-                        ->subject("New {$payload->job_type} Application: {$payload->profile_name}");
-                });
+                // Notify Recruiter
+                Mail::to($user->email)->send(new JobProfileSubmittedMail($payload));
+                
+                // Notify Admins
+                $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
+                if (!empty($adminEmails)) {
+                    Mail::to($adminEmails)->send(new AdminJobProfileNotificationMail($payload));
+                } else {
+                    $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+                    Mail::to($adminEmail)->send(new AdminJobProfileNotificationMail($payload));
+                }
             } catch (\Throwable $e) {
-                Log::warning('Job submission admin mail failed: '.$e->getMessage());
+                Log::warning('Job submission notification mails failed: '.$e->getMessage());
             }
         }
 
@@ -327,6 +340,29 @@ class JobController extends Controller
             }
         }
         if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function assertEligibilityComplete(array $disciplines): void
+    {
+        $selectedDisciplines = array_filter($disciplines, fn($d) => !empty($d['selected']));
+        
+        if (empty($selectedDisciplines)) {
+            throw ValidationException::withMessages([
+                'eligibility.disciplines_json' => ['At least one discipline must be selected for eligibility.']
+            ]);
+        }
+
+        $errors = [];
+        foreach ($selectedDisciplines as $i => $row) {
+            if (!isset($row['min_cgpa']) || $row['min_cgpa'] === '' || $row['min_cgpa'] === null) {
+                $discipline = $row['discipline'] ?? "Row $i";
+                $errors["eligibility.disciplines_json.$i.min_cgpa"] = ["CGPA/CPI is required for selected discipline: $discipline"];
+            }
+        }
+
+        if (!empty($errors)) {
             throw ValidationException::withMessages($errors);
         }
     }

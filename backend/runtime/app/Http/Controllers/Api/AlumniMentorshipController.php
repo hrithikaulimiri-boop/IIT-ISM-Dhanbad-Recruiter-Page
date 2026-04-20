@@ -6,6 +6,7 @@ use App\Models\AlumniMentorship;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\MentorshipSubmissionMail;
 use App\Mail\AdminMentorshipNotificationMail;
@@ -39,20 +40,34 @@ class AlumniMentorshipController extends Controller
 
         $validated = $request->validate($rules);
 
+        // Check the current status before updating
+        $oldStatus = AlumniMentorship::where('email', $validated['email'])->value('status');
+
         // Check if we are updating an existing draft by email
         $application = AlumniMentorship::updateOrCreate(
             ['email' => $validated['email']],
             $validated
         );
 
-        if ($application->status === 'submitted') {
-            // Notify the Alumnus
-            Mail::to($application->email)->send(new MentorshipSubmissionMail($application));
-            
-            // Notify Admins
-            $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
-            if (!empty($adminEmails)) {
-                Mail::to($adminEmails)->send(new AdminMentorshipNotificationMail($application));
+        // Only send emails if transitioning to 'submitted' from anything else (usually 'draft' or new)
+        if ($application->status === 'submitted' && $oldStatus !== 'submitted') {
+            try {
+                // Notify the Alumnus
+                Mail::to($application->email)->send(new MentorshipSubmissionMail($application));
+                
+                // Notify Admins
+                $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
+                if (!empty($adminEmails)) {
+                    Mail::to($adminEmails)->send(new AdminMentorshipNotificationMail($application));
+                } else {
+                    // Fallback to ADMIN_EMAIL if no admin users in DB
+                    $adminEmail = env('ADMIN_EMAIL');
+                    if ($adminEmail) {
+                        Mail::to($adminEmail)->send(new AdminMentorshipNotificationMail($application));
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to send alumni mentorship submission emails: " . $e->getMessage());
             }
         }
 

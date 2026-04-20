@@ -195,9 +195,14 @@ class AuthController extends Controller
             try {
                 Mail::to($user->email)->send(new RegistrationSuccessfulMail($user, $company));
                 
-                // Notify Admin
-                $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
-                Mail::to($adminEmail)->send(new RecruiterRegistrationPendingMail($user));
+                // Notify Admin(s)
+                $adminEmails = User::where('role', 'admin')->pluck('email')->toArray();
+                if (!empty($adminEmails)) {
+                    Mail::to($adminEmails)->send(new RecruiterRegistrationPendingMail($user));
+                } else {
+                    $adminEmail = env('ADMIN_EMAIL', 'admin@example.com');
+                    Mail::to($adminEmail)->send(new RecruiterRegistrationPendingMail($user));
+                }
             } catch (Throwable $e) {
                 Log::warning('Registration notification mails failed: '.$e->getMessage());
             }

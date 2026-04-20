@@ -53,6 +53,25 @@ export default function AlumniMentorshipPage() {
     status: "draft"
   });
 
+  const setFormSafe = (updater: any) => {
+    setForm(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return {
+        email: next.email || "",
+        name: next.name || "",
+        phone_number: next.phone_number || "",
+        year_of_completion: next.year_of_completion || "",
+        degree: next.degree || "",
+        discipline: next.discipline || "",
+        current_job: next.current_job || "",
+        areas_of_interest: next.areas_of_interest || "",
+        linkedin_profile: next.linkedin_profile || "",
+        general_comments: next.general_comments || "",
+        status: next.status || "draft",
+      };
+    });
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -60,20 +79,40 @@ export default function AlumniMentorshipPage() {
   const handleResume = async (email: string) => {
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) return;
     try {
-      const res = await api.get(`/alumni-mentorship/resume/${email}`);
+      const res = await api.get(`/alumni-mentorship/resume/${encodeURIComponent(email)}`);
+      console.log("Resume response:", res.data);
       if (res.data.data) {
         const saved = res.data.data;
-        setForm({
-          ...form,
-          ...saved,
-          general_comments: saved.general_comments || "",
+        if (saved.status === 'submitted') {
+          setError("This email has already been used for a submitted application. Draft resume is only available for saved drafts.");
+          setMessage("");
+          return;
+        }
+        setFormSafe({
+          email: saved.email || "",
+          name: saved.name || "",
+          phone_number: saved.phone_number || "",
+          year_of_completion: saved.year_of_completion || "",
+          degree: saved.degree || "",
+          discipline: saved.discipline || "",
+          current_job: saved.current_job || "",
+          areas_of_interest: saved.areas_of_interest || "",
           linkedin_profile: saved.linkedin_profile || "",
+          general_comments: saved.general_comments || "",
+          status: saved.status || "draft",
         });
         setMessage("Welcome back! Your previous progress has been loaded.");
-        setTimeout(() => setMessage(""), 3000);
+        setError("");
+        setTimeout(() => setMessage(""), 5000);
       }
-    } catch (err) {
-      // 404 is fine, means no draft exists
+    } catch (err: any) {
+      console.log("Resume error:", err);
+      if (err.response?.status === 404) {
+        setMessage("");
+        setError("");
+      } else {
+        setError("Failed to load draft. Please try again.");
+      }
     }
   };
 
@@ -210,8 +249,8 @@ export default function AlumniMentorshipPage() {
                       required
                       label="Full Name" 
                       fullWidth 
-                      value={form.name} 
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      value={form.name || ""} 
+                      onChange={(e) => setForm({ ...form, name: e.target.value || "" })}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><User size={20} color="#00796b" /></InputAdornment> }}
                     />
@@ -221,8 +260,8 @@ export default function AlumniMentorshipPage() {
                       required
                       label="Email Address" 
                       fullWidth 
-                      value={form.email} 
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      value={form.email || ""} 
+                      onChange={(e) => setForm({ ...form, email: e.target.value || "" })}
                       onBlur={(e) => handleResume(e.target.value)}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><Mail size={20} color="#00796b" /></InputAdornment> }}
@@ -233,8 +272,8 @@ export default function AlumniMentorshipPage() {
                       required
                       label="Phone Number" 
                       fullWidth 
-                      value={form.phone_number} 
-                      onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+                      value={form.phone_number || ""} 
+                      onChange={(e) => setForm({ ...form, phone_number: e.target.value || "" })}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><Phone size={20} color="#00796b" /></InputAdornment> }}
                     />
@@ -244,8 +283,8 @@ export default function AlumniMentorshipPage() {
                       required
                       label="Year of Completion" 
                       fullWidth 
-                      value={form.year_of_completion} 
-                      onChange={(e) => setForm({ ...form, year_of_completion: e.target.value })}
+                      value={form.year_of_completion || ""} 
+                      onChange={(e) => setForm({ ...form, year_of_completion: e.target.value || "" })}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><Calendar size={20} color="#00796b" /></InputAdornment> }}
                     />
@@ -264,8 +303,8 @@ export default function AlumniMentorshipPage() {
                       select
                       label="Degree at IIT (ISM)"
                       fullWidth
-                      value={form.degree}
-                      onChange={(e) => setForm({ ...form, degree: e.target.value, discipline: "" })}
+                      value={form.degree || ""}
+                      onChange={(e) => setForm({ ...form, degree: e.target.value || "", discipline: "" })}
                       sx={inputStyles}
                     >
                       {courseOptions.map((course) => (
@@ -280,8 +319,8 @@ export default function AlumniMentorshipPage() {
                       label="Discipline"
                       fullWidth
                       disabled={!form.degree}
-                      value={form.discipline}
-                      onChange={(e) => setForm({ ...form, discipline: e.target.value })}
+                      value={form.discipline || ""}
+                      onChange={(e) => setForm({ ...form, discipline: e.target.value || "" })}
                       sx={inputStyles}
                     >
                       {form.degree ? (
@@ -298,8 +337,8 @@ export default function AlumniMentorshipPage() {
                       required
                       label="Current Job / Position" 
                       fullWidth 
-                      value={form.current_job} 
-                      onChange={(e) => setForm({ ...form, current_job: e.target.value })}
+                      value={form.current_job || ""} 
+                      onChange={(e) => setForm({ ...form, current_job: e.target.value || "" })}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><Briefcase size={20} color="#00796b" /></InputAdornment> }}
                     />
@@ -308,8 +347,8 @@ export default function AlumniMentorshipPage() {
                     <TextField 
                       label="LinkedIn Profile Link (Optional)" 
                       fullWidth 
-                      value={form.linkedin_profile} 
-                      onChange={(e) => setForm({ ...form, linkedin_profile: e.target.value })}
+                      value={form.linkedin_profile || ""} 
+                      onChange={(e) => setForm({ ...form, linkedin_profile: e.target.value || "" })}
                       sx={inputStyles}
                       InputProps={{ startAdornment: <InputAdornment position="start"><Globe size={20} color="#00796b" /></InputAdornment> }}
                     />
@@ -329,8 +368,8 @@ export default function AlumniMentorshipPage() {
                       fullWidth 
                       multiline
                       rows={3}
-                      value={form.areas_of_interest} 
-                      onChange={(e) => setForm({ ...form, areas_of_interest: e.target.value })}
+                      value={form.areas_of_interest || ""} 
+                      onChange={(e) => setForm({ ...form, areas_of_interest: e.target.value || "" })}
                       sx={inputStyles}
                     />
                   </Grid>
@@ -340,8 +379,8 @@ export default function AlumniMentorshipPage() {
                       fullWidth 
                       multiline
                       rows={3}
-                      value={form.general_comments} 
-                      onChange={(e) => setForm({ ...form, general_comments: e.target.value })}
+                      value={form.general_comments || ""} 
+                      onChange={(e) => setForm({ ...form, general_comments: e.target.value || "" })}
                       sx={inputStyles}
                     />
                   </Grid>

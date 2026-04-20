@@ -39,9 +39,32 @@ export interface ExtractedData {
     bond_deductions?: number;
     esops?: number;
     relocation_allowance?: number;
+    medical_allowance?: number;
+    first_year_ctc?: number;
+    stocks_options?: number;
+    ctc_breakup?: string;
+    gross_salary?: number;
     monthly_take_home?: number;
     different_structure_per_programme?: boolean;
     salaries_json?: any[];
+    additional_components?: {
+      global?: {
+        joining_bonus?: string;
+        retention_bonus?: string;
+        variable_performance_bonus?: string;
+        esops_vest_period?: string;
+        relocation_allowance?: string;
+        medical_allowance?: string;
+        deductions?: string;
+        bond_amount_duration?: string;
+        first_year_ctc?: string;
+        stocks_options?: string;
+        ctc_breakup?: string;
+        gross_salary?: string;
+        hra?: string;
+      };
+      [programme: string]: any;
+    };
   };
   eligibility?: {
     global_min_cgpa?: number;
@@ -60,10 +83,14 @@ export interface ExtractedData {
     typed_signature?: string;
   };
   stages?: Array<{
+    stage_id: string;
+    sequence: string;
     name: string;
     duration?: string;
     selection_mode?: string;
     interview_mode?: string;
+    test_type?: string;
+    infrastructure_requirements?: string;
   }>;
 }
 
